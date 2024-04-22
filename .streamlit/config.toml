@@ -1,0 +1,7 @@
+[theme]
+primaryColor = '#006ee6'
+
+[server]
+maxUploadSize = 10
+enableXsrfProtection = false
+enableCORS = false
