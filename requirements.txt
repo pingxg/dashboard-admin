@@ -1,8 +1,10 @@
-pandas==1.5.2
-openpyxl==3.0.10
-mysql-connector-python==8.0.31
-sqlalchemy==1.4.46
 streamlit==1.32.2
-streamlit-authenticator==0.1.5
+plotly==5.11.0
+pandas==1.5.2
+prophet==1.1.2
 shareplum==0.5.1
+openpyxl==3.0.10
+sqlalchemy==1.4.46
+mysql-connector-python==8.0.31
 streamlit-aggrid==0.3.3
+streamlit-authenticator==0.1.5
