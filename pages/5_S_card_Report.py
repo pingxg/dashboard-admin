@@ -1,10 +1,10 @@
 import streamlit as st
 # from PIL import Image
-# st.set_page_config(
-#     page_title="S-card Report",
-#     page_icon=Image.open("assets/logo.ico"),
-#     layout='wide',
-#     initial_sidebar_state='auto')
+st.set_page_config(
+    # page_title="S-card Report",
+    # page_icon=Image.open("assets/logo.ico"),
+    layout='wide',
+    initial_sidebar_state='auto')
 import time
 import datetime
 from utils.get_master_data import location_name2id, LOCATION_MASTER
