@@ -1,10 +1,10 @@
 import streamlit as st
-from PIL import Image
-st.set_page_config(
-    page_title="S-card Report",
-    page_icon=Image.open("assets/logo.ico"),
-    layout='wide',
-    initial_sidebar_state='auto')
+# from PIL import Image
+# st.set_page_config(
+#     page_title="S-card Report",
+#     page_icon=Image.open("assets/logo.ico"),
+#     layout='wide',
+#     initial_sidebar_state='auto')
 import time
 import datetime
 from utils.get_master_data import location_name2id, LOCATION_MASTER
@@ -16,8 +16,8 @@ from st_aggrid.grid_options_builder import GridOptionsBuilder
 import plotly.express as px
 from utils.utilities import user_authantication
 
-with open('assets/style.css') as f:
-    st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
+# with open('assets/style.css') as f:
+#     st.markdown(f'<style>{f.read()}</style>', unsafe_allow_html=True)
 
 COLOR_5 = ct.color_gradient(st.secrets['START_COLOR'], st.secrets['END_COLOR'], n=5, alpha=st.secrets['OPACITY'])
 
