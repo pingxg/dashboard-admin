@@ -41,7 +41,7 @@ if authentication_status:
 
             result['Date'] = result['Date'].astype(str)
             result = result[~result['Item Category'].isin(['Valmisruoat', 'Tuore Valmisruoat'])]
-            st.write(result)
+            st.dataframe(result, use_container_width=True)
 
             if submitted:
                 for i in list(np.unique(result['email'])):

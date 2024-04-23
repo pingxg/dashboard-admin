@@ -29,7 +29,7 @@ if authentication_status:
                 df[i] = 0
 
         if df is not None:
-            st.dataframe(df)
+            st.dataframe(df, use_container_width=True)
             info_placeholder = st.empty()
             upload_btn = info_placeholder.button("Upload to Database", key=f"delivery_upload_button")
             if upload_btn and df is not None:

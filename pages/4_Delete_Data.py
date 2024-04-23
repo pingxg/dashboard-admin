@@ -101,7 +101,7 @@ if authentication_status:
         if preview_btn:
             st.info(preview_query)
             df = pd.read_sql(preview_query, con)
-            st.dataframe(df)
+            st.dataframe(df, use_container_width=True)
             placeholder = st.empty()
 
             delete_btn = placeholder.button(

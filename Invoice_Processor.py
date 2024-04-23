@@ -251,7 +251,7 @@ if authentication_status:
 
 
             st.markdown("### Following data will be removed, please check if there is any unclassified data")
-            st.dataframe(df[(df['Operating department'].isnull()) | (df['Customer code and name'].isnull()) | (df['Location (NS)'].isnull()) | (df['Sales Item Internal ID'].isnull())].reset_index(), 1500,1000)
+            st.dataframe(df[(df['Operating department'].isnull()) | (df['Customer code and name'].isnull()) | (df['Location (NS)'].isnull()) | (df['Sales Item Internal ID'].isnull())].reset_index(), 1500,1000, use_container_width=True)
 
 
             nan = df[(df['Operating department'].isnull()) | (df['Customer code and name'].isnull()) | (df['Location (NS)'].isnull()) | (df['Sales Item Internal ID'].isnull())].index

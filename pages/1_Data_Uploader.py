@@ -359,7 +359,6 @@ if authentication_status:
 
                     upload_df['location_internal_id'] = upload_df['bw_approver'].map(dict(zip(location_bw_name_master_data['bw_approver'],location_bw_name_master_data['Internal ID'])))
                     upload_df = upload_df.dropna()
-                    # st.write(upload_df)
                     upload_df['location_internal_id'] = upload_df['location_internal_id'].astype(int)
                     upload_df["date"] =  pd.to_datetime(upload_df["date_str"], format="%d.%m.%Y").dt.date
                     upload_df.drop(columns='date_str',inplace=True,errors='ignore')
@@ -446,7 +445,7 @@ if authentication_status:
                 if not not_in_master.empty:
 
                     st.write("## These items doesn't appear in the master data, please review and add it:")
-                    st.write(not_in_master['ean'].unique())
+                    st.dataframe(not_in_master['ean'].unique(), use_container_width=True)
             elif table_name == "s_card_master_data":
                 pass
 
@@ -542,7 +541,7 @@ if authentication_status:
         if df is not None and filename not in st.session_state['upload_history'].keys():
             upload_df = process_data(df=df, filename=filename, table_name=db_option_up, country=country, month=month, year=year)
             if upload_df is not None:
-                st.dataframe(upload_df)
+                st.dataframe(upload_df, use_container_width=True)
             info_placeholder = st.empty()
             upload_btn = info_placeholder.button("Upload to Database", key=f"{db_option_up}_upload_button")
             if upload_btn and upload_df is not None:
