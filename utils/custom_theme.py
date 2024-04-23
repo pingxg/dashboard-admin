@@ -1,6 +1,5 @@
 from st_aggrid import JsCode
 from colorsys import hsv_to_rgb, rgb_to_hsv
-from st_pages import Page
 
 def color_gradient(start_hex, finish_hex="#FFFFFF", n=10, alpha=1.0):
     """ returns a gradient list of (n) colors between
