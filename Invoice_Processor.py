@@ -166,7 +166,8 @@ if authentication_status:
             df['Operating department'].loc[(df['Store']=="MESTARIN HERKKU")&(df['Location (NS)']=='L84 Itsudemo Sokkari Jyväskylä')] = 'Restaurant'
 
 
-            df['Location (NS)'].loc[(df['Customer code and name']=="SFI0007 TURUN OSUUSKAUPPA")&(df['Delivery Note Date']>='2023-08-01')&(df['Sales Item Internal ID'].isin([4154, 1568]))] = 'L23 Sushibar Manhattan S-Market Turku'
+            df['Location (NS)'].loc[(df['Customer code and name'].str.contains("TURUN OSUUSKAUPPA", case=False))&(df['Delivery Note Date']>='2023-08-01')&(df['Sales Item Category']=='Firewok')] = 'L23 Sushibar Manhattan S-Market Turku'
+            df['Location (NS)'].loc[(df['Store']=="PRISMA ITÄHARJU")&(df['Delivery Note Date']>='2024-05-13')&(df['Sales Item Category']=='Firewok')] = 'L17 Sushibar Itäharju Prisma Turku'
 
 
             df['Location (NS)'].loc[(df['Delivery Note Date']>='2023-09-01')&(df['Location (NS)']=="L43 Sushibar Kaari Prisma Helsinki")&(df['Sales Item Category']=='Firewok')] = 'L72 Firewok Kaari Helsinki'
@@ -337,7 +338,7 @@ if authentication_status:
                 if st.button('Send'):
                     for i in send_data_options:
                         try:
-                            receiver = master_location.loc[master_location['Location (NS)'] == i]['send_sales_data_to'].values[0]
+                            receiver = master_location.loc[master_location['Location (NS)'] == i]['email'].values[0]
                             data_to_be_send = pd.pivot_table(df_without_converting_decimal.loc[df_without_converting_decimal['Location (NS)']==i],
                                                                 values=['Amount'], 
                                                                 index=['Delivery Note Date'], 
@@ -349,6 +350,7 @@ if authentication_status:
                                                                 margins_name='Total',
                                                                 #    observed=False
                                                                 )
+
                             if pd.notna(receiver):
                                 data_to_be_send = data_to_be_send.round(2)
                                 st.write(f'Sending {i} week {week_num} sales data to {receiver}')
