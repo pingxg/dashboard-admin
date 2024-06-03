@@ -5,3 +5,4 @@ primaryColor = '#006ee6'
 maxUploadSize = 10
 enableXsrfProtection = false
 enableCORS = false
+fileWatcherType = none
