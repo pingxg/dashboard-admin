@@ -8,7 +8,7 @@ import pandas as pd
 from utils.get_master_data import get_master_data
 
 product_master_data = get_master_data('SalesItem')
-account_master_data = get_master_data('AccountID')
+# account_master_data = get_master_data('AccountID')
 
 # Initialize connection and only run once using streamlit caching function
 @st.cache_resource(ttl=600, show_spinner=False)
@@ -54,28 +54,28 @@ def run_query(engine, query):
 def querying_data(table_name, ids, start, end):
     conn = init_connection().connect()
 
-    if table_name == "month_data":
+    # if table_name == "month_data":
 
-        query = text(f"""
-        SELECT *\n
-        FROM (\n
-        SELECT *,\n
-            DATE(CONCAT(year, '-', month, '-01')) AS date_column\n
-        FROM data.{table_name}\n
-        ) AS t\n
-        WHERE date_column >= DATE("{int(start.strftime('%Y'))}-{int(start.strftime('%m'))}-01")\n
-        AND date_column <= DATE("{int(end.strftime('%Y'))}-{int(end.strftime('%m'))}-01")\n
-        AND location_internal_id in ({", ".join([str(i) for i in ids])});
-        """)
+    #     query = text(f"""
+    #     SELECT *\n
+    #     FROM (\n
+    #     SELECT *,\n
+    #         DATE(CONCAT(year, '-', month, '-01')) AS date_column\n
+    #     FROM data.{table_name}\n
+    #     ) AS t\n
+    #     WHERE date_column >= DATE("{int(start.strftime('%Y'))}-{int(start.strftime('%m'))}-01")\n
+    #     AND date_column <= DATE("{int(end.strftime('%Y'))}-{int(end.strftime('%m'))}-01")\n
+    #     AND location_internal_id in ({", ".join([str(i) for i in ids])});
+    #     """)
 
-        df = pd.read_sql(query, con = conn)
-        df['quarter'] = (df['month']-1)//3 + 1
-        df['actual'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["actual"])))
-        df['adj'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["adj"])))
-        df['adj_coef'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["adj_coef"])))
-        df['account_name'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["account_name"])))
+    #     df = pd.read_sql(query, con = conn)
+    #     df['quarter'] = (df['month']-1)//3 + 1
+    #     df['actual'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["actual"])))
+    #     df['adj'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["adj"])))
+    #     df['adj_coef'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["adj_coef"])))
+    #     df['account_name'] = df['account_id'].map(dict(zip(account_master_data["account_id"],account_master_data["account_name"])))
 
-    elif table_name == "invoice_data":
+    if table_name == "invoice_data":
         query = text(f"""
         SELECT * FROM data.{table_name}\n
         WHERE location_internal_id in ({", ".join([str(i) for i in ids])})\n
