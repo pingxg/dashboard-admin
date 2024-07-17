@@ -362,6 +362,10 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df["date"] =  pd.to_datetime(upload_df["date_str"], format="%d.%m.%Y").dt.date
                 upload_df.drop(columns='date_str',inplace=True,errors='ignore')
                 upload_df.drop(columns="bw_approver", inplace=True)
+
+                upload_df['product_category'] = upload_df['product_category'].str.lower()
+                # Change product_category containing "fish" to "salmon"
+                upload_df.loc[upload_df['product_category'].str.contains('fish'), 'product_category'] = 'salmon'
                 # Updating date if product_category is "salmon"
                 upload_df.loc[upload_df['product_category'] == 'salmon', 'date'] += datetime.timedelta(days=7)
 
