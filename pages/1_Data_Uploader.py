@@ -200,7 +200,6 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df['upload_time'] = current_time
 
         # elif table_name == "month_data":
-            
         #     if country == "FI" and month is not None and year is not None:
         #         upload_df = df.copy()
         #         upload_df.columns = upload_df.columns.str.strip()
@@ -293,7 +292,6 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df.drop(columns=['date_str'], inplace=True, errors='ignore')
                 upload_df = upload_df.loc[upload_df['amount']!=0]
                 upload_df['amount'] = upload_df['amount']
-
             elif country == "NO":
                 upload_df = df.copy()
                 upload_df['account_id'] = upload_df['Statement of income'].str[:4]
@@ -309,7 +307,6 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df['month'] = month
                 upload_df['location_id'] = st.session_state['no_month_up_int_id']
                 upload_df = upload_df.loc[upload_df['amount']!=0]
-
         elif table_name == "workshift_data":
                 upload_df = df[['Date', 'Employee number', 'Occupational title', 'Workplace', 'Duration', 'Working hour type']]
                 upload_df.rename(columns={
@@ -334,10 +331,9 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df.drop(columns="location_internal_name", inplace=True)
                 current_time = datetime.datetime.now(pytz.timezone(st.secrets['TIMEZONE']))
                 upload_df['upload_time'] = current_time
-        
-        
         elif table_name == "purchase_data":
                 upload_df = df[['Voucher date', 'Person', 'Supplier', 'Product Group','Net amount', 'Count', 'Unit']]
+                
                 upload_df.rename(columns={
                     'Voucher date': 'date_str',
                     'Person': 'bw_approver',
@@ -347,7 +343,6 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                     'Count': 'quantity',
                     'Unit': 'unit',
                     }, inplace=True)
-
                 try:
                     upload_df['quantity'] = upload_df['quantity'].astype(str)
                     upload_df['amount'] = upload_df['amount'].str.replace(' ', '')
@@ -367,6 +362,9 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df["date"] =  pd.to_datetime(upload_df["date_str"], format="%d.%m.%Y").dt.date
                 upload_df.drop(columns='date_str',inplace=True,errors='ignore')
                 upload_df.drop(columns="bw_approver", inplace=True)
+                # Updating date if product_category is "salmon"
+                upload_df.loc[upload_df['product_category'] == 'salmon', 'date'] += datetime.timedelta(days=7)
+
                 current_time = datetime.datetime.now(pytz.timezone(st.secrets['TIMEZONE']))
                 upload_df['upload_time'] = current_time
         elif table_name == "invoice_data":
@@ -431,27 +429,7 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
 
             elif country =="NO":
                 pass
-        # elif table_name == "s_card_purchase_data":
-        #     s_card_name_master_data = LOCATION_MASTER[['Internal ID','s_card_code']].dropna().drop_duplicates()
 
-        #     upload_df = df[['Ostopäivä','Tilin laskutunniste','EAN-koodi','Tuotenimi','Summa sis. ALV (EUR)']].copy()
-            
-        #     upload_df['ean'] = upload_df['EAN-koodi'].astype(str).str.zfill(13)+ "|" + upload_df['Tuotenimi']
-        #     upload_df['ean'] = upload_df['ean'].str.lower()
-        #     upload_df['location_internal_id'] = upload_df['Tilin laskutunniste'].map(dict(zip(s_card_name_master_data['s_card_code'],s_card_name_master_data['Internal ID'])))
-        #     upload_df.drop(columns=['Tilin laskutunniste','EAN-koodi','Tuotenimi'], inplace=True)
-
-        #     upload_df.columns = ['purchase_date','amount','ean','location_internal_id']
-        #     upload_df = upload_df.replace("8715700415604|curry mango sås","8715700415604|curry mango säs")
-        #     ean_master =  custom_query("SELECT DISTINCT ean FROM data.s_card_master_data;")
-
-        #     not_in_master = upload_df[~upload_df['ean'].isin(ean_master['ean'])]
-        #     if not not_in_master.empty:
-
-        #         st.write("## These items doesn't appear in the master data, please review and add it:")
-        #         st.dataframe(not_in_master['ean'].unique(), use_container_width=True)
-        # elif table_name == "s_card_master_data":
-        #     pass
 
 
     except Exception as e:
@@ -493,20 +471,19 @@ if db_option_up != '< Please select one table >':
             type, sep, help, allow_multiple = 'csv', ',', 'Download from NetSuite each month.', False
         elif country == "EE":
             location = {
-                'Kristiine':103,
-                'Lasnamäe':104,
-                'Mustamäe':105,
-                'Rocca al Mare':309,
-                'Sikupilli':310,
-                'Head Office':516,
+                'Kristiine': 103,
+                'Lasnamäe': 104,
+                'Mustamäe': 105,
+                'Rocca al Mare': 309,
+                'Sikupilli': 310,
+                'Head Office': 516,
             }
             ee_store_selected = st.select_slider('Select which store:', options=location.keys(), key='ee_month_up')
             st.session_state['ee_month_up_int_id'] =location[ee_store_selected]
             type, sep, help, allow_multiple = 'xlsx', None, 'Download from Merit each month.', False
-            
         elif country == "NO":
             location = {
-                'Mega Metro':85,
+                'Mega Metro': 85,
             }
             col1, col2 = st.columns([1, 3])
             year = col1.number_input('Year', value=2023, step=1, key='year_up_no')
@@ -524,10 +501,6 @@ if db_option_up != '< Please select one table >':
             type, sep, help, allow_multiple = 'xlsx', None, "File you upload to NetSuite or received raw weekly report.", True
         else:
             type, sep, help, allow_multiple = 'csv', ';', "File you upload to NetSuite or received raw weekly report.", False
-    elif db_option_up == 's_card_purchase_data':
-        type, sep, help, allow_multiple = 'xlsx', None, 'Download from S-business manager.', False
-    elif db_option_up == 's_card_master_data':
-        type, sep, help, allow_multiple = 'xlsx', None, 'Download from S-business manager.', False
     elif db_option_up == 'workshift_data':
         type, sep, hel, allow_multiple = 'csv', ';', 'Download from Maraplan.', False
     elif db_option_up == 'purchase_data':
@@ -538,10 +511,7 @@ if db_option_up != '< Please select one table >':
             type, sep, help, allow_multiple = 'csv', ';', 'Download from Netsuite Suite Analytics.', False
         elif country == "EE":
             type, sep, help, allow_multiple = 'xlsx', ';', 'Download from Netsuite Suite Analytics.', False
-        
-
     df, filename = file_uploader(db_option_up, type=type, country=country, sep=sep, help=help, allow_multiple=allow_multiple)
-
     if df is not None and filename not in st.session_state['upload_history'].keys():
         upload_df = process_data(df=df, filename=filename, table_name=db_option_up, country=country, month=month, year=year)
         if upload_df is not None:
