@@ -199,62 +199,6 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 current_time = datetime.datetime.now(pytz.timezone(st.secrets['TIMEZONE']))
                 upload_df['upload_time'] = current_time
 
-        # elif table_name == "month_data":
-        #     if country == "FI" and month is not None and year is not None:
-        #         upload_df = df.copy()
-        #         upload_df.columns = upload_df.columns.str.strip()
-        #         upload_df['Financial Row'] = upload_df['Financial Row'].replace('  ',pd.np.nan)
-        #         upload_df = upload_df.dropna()
-        #         upload_df[['account_id','account_desc']] = upload_df['Financial Row'].str.split(' - ',expand=True)
-        #         upload_df['account_id'] = pd.to_numeric(upload_df['account_id'], errors='coerce')
-        #         upload_df = upload_df.dropna().reset_index()
-        #         upload_df['account_id'] = upload_df['account_id'].astype(int)
-        #         upload_df.drop(columns=['Total','index','Financial Row','account_desc','- No Location -'], inplace=True, errors='ignore')
-        #         upload_df[upload_df.columns[:-1]] = upload_df[upload_df.columns[:-1]].replace('[\€]', '', regex=True)
-        #         upload_df = upload_df.replace(' ', '', regex=True).replace(',', '.', regex=True)
-        #         upload_df = upload_df.apply(pd.to_numeric, errors='ignore')
-        #         upload_df = pd.melt(upload_df, id_vars=['account_id'], var_name='location_internal_name', value_name='amount')
-        #         upload_df['amount'] = upload_df['amount'].round(decimals=2)
-        #         upload_df = upload_df.loc[(upload_df!=0).all(axis=1)]
-        #         upload_df.loc[(upload_df["account_id"]>=4000) & (upload_df["account_id"]<7000), "amount"] *= -1
-        #         upload_df['year'] = year
-        #         upload_df['month'] = month
-        #         upload_df['country'] = country
-        #         upload_df['account_id'] = upload_df["country"] +"-"+ upload_df['account_id'].astype(str)
-        #         location_master_data_copy = location_master_data[['Location (NS)','Internal ID']].copy().dropna()
-        #         upload_df['location_internal_id'] = upload_df['location_internal_name'].map(dict(zip(location_master_data_copy['Location (NS)'],location_master_data_copy['Internal ID']))).astype(int)
-        #         upload_df['account_type'] = upload_df['account_id'].map(dict(zip(account_master_data['account_id'],account_master_data['account_type'])))
-        #         upload_df.drop(columns=['location_internal_name','country'], inplace=True, errors='ignore')
-        #     elif country == "EE":
-        #         upload_df = df.copy()
-        #         upload_df['location_internal_id'] = st.session_state['ee_month_up_int_id']
-        #         upload_df = upload_df.fillna(0)
-        #         upload_df['account_id'] = "EE" +"-"+ upload_df['Account code'].astype(str)
-        #         upload_df['account_type'] = upload_df['account_id'].map(dict(zip(account_master_data['account_id'],account_master_data['account_type'])))
-        #         upload_df.drop(columns=['Description','Account name','Account code'], inplace=True, errors='ignore')
-        #         upload_df = upload_df.melt(id_vars=['location_internal_id','account_id','account_type'],var_name='date_str',value_name='amount')
-        #         upload_df['month']=pd.to_datetime(upload_df["date_str"], format="%d.%m.%Y").dt.month
-        #         upload_df['year']=pd.to_datetime(upload_df["date_str"], format="%d.%m.%Y").dt.year
-        #         upload_df.drop(columns=['date_str'], inplace=True, errors='ignore')
-        #         upload_df = upload_df.loc[upload_df['amount']!=0]
-        #     elif country == "NO":
-        #         upload_df = df.copy()
-        #         upload_df['account_id'] = upload_df['Statement of income'].str[:4]
-        #         upload_df['account_id'] = pd.to_numeric(upload_df['account_id'], errors='coerce')
-        #         upload_df = upload_df.dropna(subset=['account_id'])
-        #         upload_df['amount'] = upload_df['Unnamed: 1']
-        #         upload_df = upload_df[['account_id','amount']]
-        #         # upload_df['accound_id'] = upload_df['accound_id'].astype(int)
-        #         upload_df.dropna(inplace=True)
-        #         upload_df['amount'].loc[(upload_df['account_id']>=4000)&(upload_df['account_id']<8000)] *= -1
-        #         upload_df['account_id'] = country+"-"+upload_df['account_id'].astype(int).astype(str)
-        #         upload_df['year'] = year
-        #         upload_df['month'] = month
-        #         upload_df['location_internal_id'] = st.session_state['no_month_up_int_id']
-        #         upload_df['account_type'] = upload_df['account_id'].map(dict(zip(account_master_data['account_id'],account_master_data['account_type'])))
-        #         upload_df['amount'] = upload_df['amount']/10
-
-
         elif table_name == "financial_data":
             if country == "FI" and month is not None and year is not None:
                 upload_df = df.copy()
@@ -469,7 +413,7 @@ if db_option_up != '< Please select one table >':
         country = st.radio("Which country does the data belong to?",('FI','EE','NO'), horizontal=True)
         if country == "FI":
             col1, col2 = st.columns([1, 3])
-            year = col1.number_input('Year', value=2023, step=1, key='year_up')
+            year = col1.number_input('Year', value=datetime.datetime.now().year, step=1, key='year_up')
             month_selected = col2.select_slider('Month', options=month_list, key='month_up')
             month = month_list.index(month_selected) + 1
             type, sep, help, allow_multiple = 'csv', ',', 'Download from NetSuite each month.', False
@@ -490,7 +434,7 @@ if db_option_up != '< Please select one table >':
                 'Mega Metro': 85,
             }
             col1, col2 = st.columns([1, 3])
-            year = col1.number_input('Year', value=2023, step=1, key='year_up_no')
+            year = col1.number_input('Year', value=datetime.datetime.now().year, step=1, key='year_up_no')
             month_selected = col2.select_slider('Month', options=month_list, key='month_up_no')
             month = month_list.index(month_selected) + 1
             # no_store_selected = st.select_slider('Select which store:', options=location.keys(), key='no_month_up')
@@ -521,7 +465,38 @@ if db_option_up != '< Please select one table >':
         if upload_df is not None:
             st.dataframe(upload_df, use_container_width=True)
         info_placeholder = st.empty()
-        upload_btn = info_placeholder.button("Upload to Database", key=f"{db_option_up}_upload_button")
+        upload_btn = st.button("Upload to Database", key=f"{db_option_up}_upload_button")
+        if db_option_up == 'financial_data':
+            update_btn = st.button("Update records", key=f"{db_option_up}_update_button")
+
+
+            if update_btn and upload_df is not None:
+                if filename not in st.session_state['upload_history'].keys():
+                    try:
+                        info_placeholder.info(f'Start updateing {upload_df.shape[0]} rows of {db_option_up.replace("_"," ")}...',icon="ℹ️")
+                        custom_query(f"""
+                            SET SQL_SAFE_UPDATES = 0
+                            DELETE FROM financial_data
+                            WHERE month={month} AND year={year} AND account_id LIKE '{country}-%'
+                            SET SQL_SAFE_UPDATES = 1;
+                            """)
+                        upload_df.to_sql(name=db_option_up, con=con, schema="data", index=False, if_exists='append', chunksize=1000, method='multi')
+                        st.session_state['upload_history'][filename] = 'uploaded'
+                    except Exception as e:
+                        info_placeholder.error(f'Something is wrong when updating data to the database.', icon="🚨")
+                        st.write(e)
+                        if st.secrets['EMAIL_ALERT']:
+                            send_email(st.secrets["OFFICE_USN"], f'Error message when uploading {db_option_up.replace("_", " ")}', e)
+                        st.stop()
+                    finally:
+                        time.sleep(5)
+                        # Clear all those elements:
+                        info_placeholder.empty()
+                else:
+                    st.error(f"You have already updated this data, please don't upload again!", icon="🚨")
+                    st.stop()
+
+
         if upload_btn and upload_df is not None:
             if filename not in st.session_state['upload_history'].keys():
                 try:
