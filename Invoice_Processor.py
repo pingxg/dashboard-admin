@@ -294,68 +294,68 @@ with sok_data:
             new_df.loc[(new_df['month'] == end_of_week.month) & (new_df['split_month'] == True),'invoice_text_1'] = f"{this_month_first_day.strftime('%d.%m')}-{end_of_week.strftime('%d.%m.%Y')} - Week {week_num}"
             new_df['invoice_date'].loc[(new_df['split_month']==True) & (new_df['month'] == start_of_week.month)] = new_df['invoice_text_1'].str.split('-',expand=True)[1].str.strip()
 
-        # col1, col2 = st.columns([1,1])
+        col1, col2 = st.columns([1,1])
 
-        # with col1:
-        st.header("Download CSV file")
+        with col1:
+            st.header("Download CSV file")
 
-        total_wo_vat = new_df['Amount'].sum()
-        df_without_converting_decimal = new_df.copy()
-        new_df = new_df.replace([np.inf, -np.inf], 0)
-        new_df['Unit Price'] = new_df['Unit Price'].fillna(0)
-        new_df['Quantity'] = new_df['Quantity'].round(decimals=2).astype(str).str.replace('.', ',',regex=False)
-        new_df['Amount'] = new_df['Amount'].round(decimals=2).astype(str).str.replace('.', ',',regex=False)
-        new_df['Unit Price'] = new_df['Unit Price'].round(decimals=2).astype(str).str.replace('.', ',',regex=False)
-        new_df['Delivery Note Date'] = new_df['Delivery Note Date'].dt.strftime('%d.%m.%Y')
-        new_df['invoice_date'] = new_df['invoice_date'].dt.strftime('%d.%m.%Y')
-        new_df['due_date'] = new_df['due_date'].dt.strftime('%d.%m.%Y')
+            total_wo_vat = new_df['Amount'].sum()
+            df_without_converting_decimal = new_df.copy()
+            new_df = new_df.replace([np.inf, -np.inf], 0)
+            new_df['Unit Price'] = new_df['Unit Price'].fillna(0)
+            new_df['Quantity'] = new_df['Quantity'].round(decimals=2).astype(str).str.replace('.', ',',regex=False)
+            new_df['Amount'] = new_df['Amount'].round(decimals=2).astype(str).str.replace('.', ',',regex=False)
+            new_df['Unit Price'] = new_df['Unit Price'].round(decimals=2).astype(str).str.replace('.', ',',regex=False)
+            new_df['Delivery Note Date'] = new_df['Delivery Note Date'].dt.strftime('%d.%m.%Y')
+            new_df['invoice_date'] = new_df['invoice_date'].dt.strftime('%d.%m.%Y')
+            new_df['due_date'] = new_df['due_date'].dt.strftime('%d.%m.%Y')
 
 
-        new_df = new_df.drop(['index','next','ALV14','Commission Rate','Tax Rate','split_month','month'],axis=1,errors='ignore')
+            new_df = new_df.drop(['index','next','ALV14','Commission Rate','Tax Rate','split_month','month'],axis=1,errors='ignore')
 
-        csv = new_df.to_csv(sep=';', index=False).encode('utf-8')
+            csv = new_df.to_csv(sep=';', index=False).encode('utf-8')
 
-        st.write(f'Total (VAT0): {round(total_wo_vat,2)}')
+            st.write(f'Total (VAT0): {round(total_wo_vat,2)}')
 
-        st.download_button(
-            label="Download data as CSV",
-            data=csv,
-            file_name=f'{datetime.datetime.now(pytz.timezone("Europe/Helsinki")).strftime("%Y%m%d%H%M")}.csv',
-            mime='text/csv',
-        )
+            st.download_button(
+                label="Download data as CSV",
+                data=csv,
+                file_name=f'{datetime.datetime.now(pytz.timezone("Europe/Helsinki")).strftime("%Y%m%d%H%M")}.csv',
+                mime='text/csv',
+            )
         
-        # with col2:
-        #     st.header("Send sales data to franchisee")
-        #     send_data_options = st.multiselect(
-        #     'Stores that you need to send sales data?',
-        #     list(np.unique(np.array(new_df['Location (NS)']))),
-        #     ['L56 Sushibar Lippulaiva Prisma Espoo', 'L36 Sushibar Syke Prisma Lahti'])
+        with col2:
+            st.header("Send sales data to franchisee")
+            send_data_options = st.multiselect(
+            'Stores that you need to send sales data?',
+            list(np.unique(np.array(new_df['Location (NS)']))),
+            ['L56 Sushibar Lippulaiva Prisma Espoo', 'L36 Sushibar Syke Prisma Lahti'])
 
-        #     if st.button('Send'):
-        #         for i in send_data_options:
-        #             try:
-        #                 receiver = master_location.loc[master_location['Location (NS)'] == i]['email'].values[0]
-        #                 data_to_be_send = pd.pivot_table(df_without_converting_decimal.loc[df_without_converting_decimal['Location (NS)']==i],
-        #                                                     values=['Amount'], 
-        #                                                     index=['Delivery Note Date'], 
-        #                                                     columns=['Sales Item Category'], 
-        #                                                     aggfunc='sum',
-        #                                                     fill_value=0,
-        #                                                     margins=True,
-        #                                                     #    dropna=True, 
-        #                                                     margins_name='Total',
-        #                                                     #    observed=False
-        #                                                     )
+            if st.button('Send'):
+                for i in send_data_options:
+                    try:
+                        receiver = master_location.loc[master_location['Location (NS)'] == i]['email'].values[0]
+                        data_to_be_send = pd.pivot_table(df_without_converting_decimal.loc[df_without_converting_decimal['Location (NS)']==i],
+                                                            values=['Amount'], 
+                                                            index=['Delivery Note Date'], 
+                                                            columns=['Sales Item Category'], 
+                                                            aggfunc='sum',
+                                                            fill_value=0,
+                                                            margins=True,
+                                                            #    dropna=True, 
+                                                            margins_name='Total',
+                                                            #    observed=False
+                                                            )
 
-        #                 if pd.notna(receiver):
-        #                     data_to_be_send = data_to_be_send.round(2)
-        #                     st.write(f'Sending {i} week {week_num} sales data to {receiver}')
-        #                     send_email(receiver, f"Week {week_num} sales - {i}", data_to_be_send)
-        #                 else:
-        #                     st.write(f'Cannot find email address for receiving {i}\'s sales data')
-        #             except:
-        #                 pass
-        #         st.balloons()
+                        if pd.notna(receiver):
+                            data_to_be_send = data_to_be_send.round(2)
+                            st.write(f'Sending {i} week {week_num} sales data to {receiver}')
+                            send_email(receiver, f"Week {week_num} sales - {i}", data_to_be_send)
+                        else:
+                            st.write(f'Cannot find email address for receiving {i}\'s sales data')
+                    except:
+                        pass
+                st.balloons()
 
 
 with delivery_data:
