@@ -22,4 +22,3 @@ if sok_data is not None:
 
     # Display the dataframe
     st.write(df)
-
