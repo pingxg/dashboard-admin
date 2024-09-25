@@ -17,6 +17,27 @@ st.set_page_config(layout="wide")
 
 auth_widgets()
 
+
+def add_position(df, col_name):
+    """
+    input: any dataframe
+    output: dataframe with a column "Position", cumulative counting number starting from 0, and reset if the col_name change.
+    """
+    df["Position"] = df.groupby(col_name).cumcount()
+    return df
+
+def get_start_and_end_date_from_calendar_week(year, calendar_week):
+    """
+    input: year number, int; iso week number
+    output: start date and end date of the week, data type: datetime
+    """
+    monday = datetime.datetime.strptime(
+        f"{year}/{calendar_week}/1", "%Y/%W/%w"
+    ).date()
+    return monday, monday + datetime.timedelta(days=6.9)
+
+
+
 # Start writing title
 st.markdown("# Invoice CSV template 🎈")
 st.markdown("### Upload raw sales data")
@@ -37,24 +58,6 @@ with sok_data:
         help="Find it from SOK",
         accept_multiple_files=True,
     )
-
-    def add_position(df, col_name):
-        """
-        input: any dataframe
-        output: dataframe with a column "Position", cumulative counting number starting from 0, and reset if the col_name change.
-        """
-        df["Position"] = df.groupby(col_name).cumcount()
-        return df
-
-    def get_start_and_end_date_from_calendar_week(year, calendar_week):
-        """
-        input: year number, int; iso week number
-        output: start date and end date of the week, data type: datetime
-        """
-        monday = datetime.datetime.strptime(
-            f"{year}/{calendar_week}/1", "%Y/%W/%w"
-        ).date()
-        return monday, monday + datetime.timedelta(days=6.9)
 
     # Start the main loop, if both file holder is NOT empty, then start the process
     if last_externalID_ns is not None and sok_data is not None:
@@ -81,10 +84,7 @@ with sok_data:
         master_customer = pd.read_excel(
             master_data, sheet_name="Customer"
         )  # read "SalesItem" tab
-        master_sale_item = master_sale_item.dropna(
-            subset=["EAN"]
-        )  # delete rows don't have EAN code
-        # master_sale_item['EAN'] = master_sale_item['EAN'].astype(int)       # change all the EAN code to integer
+        master_sale_item = master_sale_item.dropna(subset=["EAN"])
 
         # -----------------------------
 
@@ -101,6 +101,9 @@ with sok_data:
             df = pd.read_csv(
                 sok_data, sep=";", encoding="utf-16", skiprows=[0, 1]
             ).fillna(0)
+        if df.empty:
+            st.stop()
+
         df = df.drop(
             ["Etiketin lisäteksti", "KP koko", "My vol (kilo, litra)", "AOK"], axis=1
         )  # delete these columns
@@ -684,6 +687,7 @@ with sok_data:
                 mime="text/csv",
             )
 
+        st.write(new_df)
         with col2:
             st.header("Send sales data to franchisee")
             send_data_options = st.multiselect(
