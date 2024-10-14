@@ -10,6 +10,8 @@ from utils.get_master_data import LOCATION_MASTER, get_master_data
 from utils.send_email import send_email
 from utils.utilities import auth_widgets
 from sqlalchemy import text
+from io import BytesIO
+
 
 warnings.filterwarnings('ignore')
 st.set_page_config(layout="wide")
@@ -65,20 +67,20 @@ def file_uploader(label, type="csv", country="FI", sep=";", help=None, allow_mul
                     if isinstance(data, list):
                         output = pd.DataFrame()
                         for file in data:
-                            df = pd.read_excel(file, engine='openpyxl')
+                            df = pd.read_excel(BytesIO(file), engine='openpyxl')
                             output = pd.concat([df, output], sort=False)
                         df = output.copy()
                 elif label in ["month_data", "financial_data"] and country == "EE":
-                    df = pd.read_excel(data, engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
                 elif label in ["month_data", "financial_data"] and country == "NO":
-                    df = pd.read_excel(data, engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
                 elif label == "invoice_data" and country == "EE":
-                    df = pd.read_excel(data, engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
                 if label == "sales_data" and country == "EE":
                     if isinstance(data, list):
                         output = pd.DataFrame()
                         for file in data:
-                            df = pd.read_excel(file, engine='openpyxl')
+                            df = pd.read_excel(BytesIO(file), engine='openpyxl')
                             df.dropna(how='all', inplace=True, axis=0)
                             df.dropna(how='any', inplace=True, axis=1)
                             df.columns = ['store_name', 'date', 'ean_name', '_amount', '_amount_vat','quantity']
@@ -86,9 +88,9 @@ def file_uploader(label, type="csv", country="FI", sep=";", help=None, allow_mul
 
                         df = output.copy()
                     else:
-                        df = pd.read_excel(data, engine='openpyxl')
+                        df = pd.read_excel(BytesIO(data), engine='openpyxl')
                 if label == "s_card_purchase_data":
-                    df = pd.read_excel(data, engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
                     
             elif type == "txt" or type == "TXT":
                 if label == "purchase_data":

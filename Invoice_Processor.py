@@ -12,11 +12,12 @@ from utils.get_master_data import get_master_data
 from utils.db_query import init_connection
 from utils.utilities import auth_widgets
 from sqlalchemy import text
+from io import BytesIO
+
 
 st.set_page_config(layout="wide")
 
 auth_widgets()
-
 
 def add_position(df, col_name):
     """
@@ -37,12 +38,12 @@ def get_start_and_end_date_from_calendar_week(year, calendar_week):
     return monday, monday + datetime.timedelta(days=6.9)
 
 
-
 # Start writing title
 st.markdown("# Invoice CSV template 🎈")
 st.markdown("### Upload raw sales data")
 
 sok_data, delivery_data = st.tabs(["On-Site sales", "Delivery sales"])
+
 with sok_data:
 
     # Input field for NS external ID
@@ -67,26 +68,19 @@ with sok_data:
             username=st.secrets["OFFICE_USN"],
             password=st.secrets["OFFICE_PSW"],
         ).GetCookies()
-        site = Site(
-            st.secrets["SHAREPOINT_SITE"], version=Version.v365, authcookie=authcookie
-        )  # go to the finance site
-        folder = site.Folder(st.secrets["MASTER_DATA_LOCATION"])  # open the folder path
-        master_data = folder.get_file(
-            "Master Data.xlsx"
-        )  # read master data from sharepoint
-        master_sok = pd.read_excel(master_data, sheet_name="SOK")  # read "SOK" tab
-        master_location = pd.read_excel(
-            master_data, sheet_name="Location"
-        )  # read "Location" tab
-        master_sale_item = pd.read_excel(
-            master_data, sheet_name="SalesItem"
-        )  # read "SalesItem" tab
-        master_customer = pd.read_excel(
-            master_data, sheet_name="Customer"
-        )  # read "SalesItem" tab
-        master_sale_item = master_sale_item.dropna(subset=["EAN"])
 
-        # -----------------------------
+        site = Site(
+            st.secrets["SHAREPOINT_SITE"],
+            version=Version.v365,
+            authcookie=authcookie
+        )
+        folder = site.Folder(st.secrets["MASTER_DATA_LOCATION"])
+        master_data = folder.get_file("Master Data.xlsx")
+        master_sok = pd.read_excel(BytesIO(master_data), sheet_name="SOK")
+        master_location = pd.read_excel(BytesIO(master_data), sheet_name="Location")
+        master_sale_item = pd.read_excel(BytesIO(master_data), sheet_name="SalesItem")
+        master_customer = pd.read_excel(BytesIO(master_data), sheet_name="Customer")
+        master_sale_item = master_sale_item.dropna(subset=["EAN"])
 
         if isinstance(sok_data, list):
             output = pd.DataFrame()
@@ -101,649 +95,496 @@ with sok_data:
             df = pd.read_csv(
                 sok_data, sep=";", encoding="utf-16", skiprows=[0, 1]
             ).fillna(0)
-        if df.empty:
-            st.stop()
+        if not df.empty:
 
-        df = df.drop(
-            ["Etiketin lisäteksti", "KP koko", "My vol (kilo, litra)", "AOK"], axis=1
-        )  # delete these columns
-        df.columns = [
-            "Delivery Note Date",
-            "Store",
-            "EAN",
-            "Product Name",
-            "Sales Unit",
-            "Tax Rate",
-            "ALV14",
-            "Quantity",
-        ]  # rename columns according to current order
+            df = df.drop(
+                ["Etiketin lisäteksti", "KP koko", "My vol (kilo, litra)", "AOK"], axis=1
+            )  # delete these columns
+            df.columns = [
+                "Delivery Note Date",
+                "Store",
+                "EAN",
+                "Product Name",
+                "Sales Unit",
+                "Tax Rate",
+                "ALV14",
+                "Quantity",
+            ]  # rename columns according to current order
 
-        df["ALV14"] = (
-            df["ALV14"].astype(str).str.replace(" ", "")
-        )  # remove all the spaces in the value
-        df["ALV14"] = (
-            df["ALV14"].astype(str).str.replace(",", ".").astype(float)
-        )  # replace all the "," to "." in the value
-        df["Quantity"] = (
-            df["Quantity"].astype(str).str.replace(" ", "")
-        )  # remove all the spaces in the value
-        df["Quantity"] = (
-            df["Quantity"].astype(str).str.replace(",", ".").astype(float)
-        )  # replace all the "," to "." in the value
-        df["Delivery Note Date"] = pd.to_datetime(
-            df["Delivery Note Date"], format="%d.%m.%Y"
-        )
-        df = df.sort_values(by="Store")
+            df["ALV14"] = (
+                df["ALV14"].astype(str).str.replace(" ", "")
+            )  # remove all the spaces in the value
+            df["ALV14"] = (
+                df["ALV14"].astype(str).str.replace(",", ".").astype(float)
+            )  # replace all the "," to "." in the value
+            df["Quantity"] = (
+                df["Quantity"].astype(str).str.replace(" ", "")
+            )  # remove all the spaces in the value
+            df["Quantity"] = (
+                df["Quantity"].astype(str).str.replace(",", ".").astype(float)
+            )  # replace all the "," to "." in the value
+            df["Delivery Note Date"] = pd.to_datetime(
+                df["Delivery Note Date"], format="%d.%m.%Y"
+            )
+            df = df.sort_values(by="Store")
 
-        # -----------------------------
-        df["Operating department"] = df["Store"].map(
-            dict(zip(master_sok["Ketjuyksikkö"], master_sok["Operating department"]))
-        )
-        df["Customer code and name"] = df["Store"].map(
-            dict(
-                zip(
-                    master_location["Ketjuyksikkö (SOK)"],
-                    master_location["Customer code and name"],
+            # -----------------------------
+            df["Operating department"] = df["Store"].map(
+                dict(zip(master_sok["Ketjuyksikkö"], master_sok["Operating department"]))
+            )
+            df["Customer code and name"] = df["Store"].map(
+                dict(
+                    zip(
+                        master_location["Ketjuyksikkö (SOK)"],
+                        master_location["Customer code and name"],
+                    )
                 )
             )
-        )
-        df["Tax code internalID"] = df["Customer code and name"].map(
-            dict(
-                zip(master_customer["ID+Name"], master_customer["Tax code internalID"])
-            )
-        )
-        df["Location (NS)"] = df["Store"].map(
-            dict(
-                zip(
-                    master_location["Ketjuyksikkö (SOK)"],
-                    master_location["Location (NS)"],
+            df["Tax code internalID"] = df["Customer code and name"].map(
+                dict(
+                    zip(master_customer["ID+Name"], master_customer["Tax code internalID"])
                 )
             )
-        )
-        df["PO"] = df["Store"].map(
-            dict(
-                zip(
-                    master_location["Ketjuyksikkö (SOK)"], master_location["#PO number"]
+            df["Location (NS)"] = df["Store"].map(
+                dict(
+                    zip(
+                        master_location["Ketjuyksikkö (SOK)"],
+                        master_location["Location (NS)"],
+                    )
                 )
             )
-        )
-        df["invoice-specific message"] = df["Store"].map(
-            dict(
-                zip(
-                    master_location["Ketjuyksikkö (SOK)"],
-                    master_location["invoice-specific message"],
+            df["PO"] = df["Store"].map(
+                dict(
+                    zip(
+                        master_location["Ketjuyksikkö (SOK)"], master_location["#PO number"]
+                    )
                 )
             )
-        )
-        df["Sales Item Internal ID"] = df["EAN"].map(
-            dict(zip(master_sale_item["EAN"], master_sale_item["Internal ID PROD"]))
-        )
-
-        df["Sales Item Category"] = df["EAN"].map(
-            dict(zip(master_sale_item["EAN"], master_sale_item["Item Category"]))
-        )
-        df["Department"] = df["EAN"].map(
-            dict(zip(master_sale_item["EAN"], master_sale_item["Department"]))
-        )
-        df["Class"] = df["EAN"].map(
-            dict(zip(master_sale_item["EAN"], master_sale_item["Class"]))
-        )
-        df["split_month"] = df["Customer code and name"].map(
-            dict(zip(master_customer["ID+Name"], master_customer["split_month"]))
-        )
-        df["Commission Rate"] = df["Store"].map(
-            dict(
-                zip(master_location["Ketjuyksikkö (SOK)"], master_location["commision"])
+            df["invoice-specific message"] = df["Store"].map(
+                dict(
+                    zip(
+                        master_location["Ketjuyksikkö (SOK)"],
+                        master_location["invoice-specific message"],
+                    )
+                )
             )
-        )
-        df["Amount"] = (df["ALV14"] / 1.14) * df["Commission Rate"]
-        df["Unit Price"] = df["Amount"] / df["Quantity"]
+            df["Sales Item Internal ID"] = df["EAN"].map(
+                dict(zip(master_sale_item["EAN"], master_sale_item["Internal ID PROD"]))
+            )
 
-        # Some special situation that needs to be set seperately
-        plant_by_product_list = [
-            8801043157742,
-            8801043150620,
-            8801073113428,
-            8801073113404,
-            8936036020373,
-            6970399920057,
-            6970399920439,
-            4902494008004,
-            5710067001968,
-            4902494090153,
-        ]
-        df["Department"].loc[
-            (df["Store"] == "PRISMA RIIHIMÄKI")
-            & (df["EAN"].isin(plant_by_product_list))
-            & (df["Delivery Note Date"] < "2023-01-22")
-            & (df["Delivery Note Date"] > "2022-05-01")
-        ] = "Food Plant"
-        df["Department"].loc[
-            (df["Store"] == "PRISMA LAUNE")
-            & (df["EAN"].isin(plant_by_product_list))
-            & (df["Delivery Note Date"] < "2023-01-22")
-            & (df["Delivery Note Date"] > "2022-05-01")
-        ] = "Food Plant"
-        df["Department"].loc[
-            (df["Store"] == "PRISMA FORSSA")
-            & (df["EAN"].isin(plant_by_product_list))
-            & (df["Delivery Note Date"] < "2023-01-22")
-            & (df["Delivery Note Date"] > "2022-05-01")
-        ] = "Food Plant"
-        df["Department"].loc[
-            (df["Operating department"] == "Food Plant")
-        ] = "Food Plant"
+            df["Sales Item Category"] = df["EAN"].map(
+                dict(zip(master_sale_item["EAN"], master_sale_item["Item Category"]))
+            )
+            df["Department"] = df["EAN"].map(
+                dict(zip(master_sale_item["EAN"], master_sale_item["Department"]))
+            )
+            df["Class"] = df["EAN"].map(
+                dict(zip(master_sale_item["EAN"], master_sale_item["Class"]))
+            )
+            df["split_month"] = df["Customer code and name"].map(
+                dict(zip(master_customer["ID+Name"], master_customer["split_month"]))
+            )
+            df["Commission Rate"] = df["Store"].map(
+                dict(
+                    zip(master_location["Ketjuyksikkö (SOK)"], master_location["commision"])
+                )
+            )
+            df["Amount"] = (df["ALV14"] / 1.14) * df["Commission Rate"]
+            df["Unit Price"] = df["Amount"] / df["Quantity"]
 
-        df["Amount"].loc[
-            (df["Store"] == "S-MARKET MANHATTAN")
-            & (df["Sales Item Category"] == "Sushi")
-        ] *= 0.9444444
-        df["Amount"].loc[
-            (df["Store"] == "S-MARKET NIKKILÄ")
-            & (df["Delivery Note Date"] >= "2023-08-01")
-        ] *= 1.088235
+            # Some special situation that needs to be set seperately
+            plant_by_product_list = [
+                8801043157742,
+                8801043150620,
+                8801073113428,
+                8801073113404,
+                8936036020373,
+                6970399920057,
+                6970399920439,
+                4902494008004,
+                5710067001968,
+                4902494090153,
+            ]
+            df["Department"].loc[
+                (df["Store"] == "PRISMA RIIHIMÄKI")
+                & (df["EAN"].isin(plant_by_product_list))
+                & (df["Delivery Note Date"] < "2023-01-22")
+                & (df["Delivery Note Date"] > "2022-05-01")
+            ] = "Food Plant"
+            df["Department"].loc[
+                (df["Store"] == "PRISMA LAUNE")
+                & (df["EAN"].isin(plant_by_product_list))
+                & (df["Delivery Note Date"] < "2023-01-22")
+                & (df["Delivery Note Date"] > "2022-05-01")
+            ] = "Food Plant"
+            df["Department"].loc[
+                (df["Store"] == "PRISMA FORSSA")
+                & (df["EAN"].isin(plant_by_product_list))
+                & (df["Delivery Note Date"] < "2023-01-22")
+                & (df["Delivery Note Date"] > "2022-05-01")
+            ] = "Food Plant"
+            df["Department"].loc[
+                (df["Operating department"] == "Food Plant")
+            ] = "Food Plant"
 
-        df = df.drop(
-            df.loc[
-                (df["Store"] == "SOKOS TAMPERE PT")
+            df["Amount"].loc[
+                (df["Store"] == "S-MARKET MANHATTAN")
+                & (df["Sales Item Category"] == "Sushi")
+            ] *= 0.9444444
+            df["Amount"].loc[
+                (df["Store"] == "S-MARKET NIKKILÄ")
+                & (df["Delivery Note Date"] >= "2023-08-01")
+            ] *= 1.088235
+
+            df = df.drop(
+                df.loc[
+                    (df["Store"] == "SOKOS TAMPERE PT")
+                    & (df["Delivery Note Date"] > "2022-11-06")
+                ].index
+            )
+            df = df.drop(
+                df.loc[
+                    (df["Store"] == "S-MARKET MYYRMANNI")
+                    & (df["Delivery Note Date"] > "2022-11-05")
+                ].index
+            )
+            df["Location (NS)"].loc[
+                (df["Store"] == "S-MARKET MÄNTSÄLÄ")
                 & (df["Delivery Note Date"] > "2022-11-06")
-            ].index
-        )
-        df = df.drop(
-            df.loc[
-                (df["Store"] == "S-MARKET MYYRMANNI")
-                & (df["Delivery Note Date"] > "2022-11-05")
-            ].index
-        )
-        df["Location (NS)"].loc[
-            (df["Store"] == "S-MARKET MÄNTSÄLÄ")
-            & (df["Delivery Note Date"] > "2022-11-06")
-        ] = "L102 Food Plant Espoo"
-        df["Department"].loc[
-            (df["Store"] == "S-MARKET MÄNTSÄLÄ")
-            & (df["Delivery Note Date"] > "2022-11-06")
-        ] = "Food Plant"
-        df["Location (NS)"].loc[
-            (df["Department"] == "Food Plant")
-        ] = "L102 Food Plant Espoo"
+            ] = "L102 Food Plant Espoo"
+            df["Department"].loc[
+                (df["Store"] == "S-MARKET MÄNTSÄLÄ")
+                & (df["Delivery Note Date"] > "2022-11-06")
+            ] = "Food Plant"
+            df["Location (NS)"].loc[
+                (df["Department"] == "Food Plant")
+            ] = "L102 Food Plant Espoo"
 
-        df["Location (NS)"].loc[
-            (df["Store"] == "PRISMA PIRKKALA")
-            & (df["Delivery Note Date"] >= "2023-02-01")
-        ] = "L29 Sushibar Pirkkala Prisma Pirkkala"
-        df["Department"].loc[
-            (df["Store"] == "PRISMA PIRKKALA")
-            & (df["Delivery Note Date"] >= "2023-02-01")
-        ] = "Food Kiosk Sushibar"
-        df["Operating department"].loc[
-            (df["Store"] == "PRISMA PIRKKALA")
-            & (df["Delivery Note Date"] >= "2023-02-01")
-        ] = "Food Kiosk Sushibar"
+            df["Location (NS)"].loc[
+                (df["Store"] == "PRISMA PIRKKALA")
+                & (df["Delivery Note Date"] >= "2023-02-01")
+            ] = "L29 Sushibar Pirkkala Prisma Pirkkala"
+            df["Department"].loc[
+                (df["Store"] == "PRISMA PIRKKALA")
+                & (df["Delivery Note Date"] >= "2023-02-01")
+            ] = "Food Kiosk Sushibar"
+            df["Operating department"].loc[
+                (df["Store"] == "PRISMA PIRKKALA")
+                & (df["Delivery Note Date"] >= "2023-02-01")
+            ] = "Food Kiosk Sushibar"
 
-        df["Location (NS)"].loc[
-            (df["Store"] == "S-MARKET HANSA HERKKU")
-            & (df["Delivery Note Date"] >= "2023-05-22")
-        ] = "L23 Sushibar Manhattan S-Market Turku"
-        df["Department"].loc[
-            (df["Store"] == "S-MARKET HANSA HERKKU")
-            & (df["Delivery Note Date"] >= "2023-05-22")
-        ] = "Food Kiosk Sushibar"
-        df["Operating department"].loc[
-            (df["Store"] == "S-MARKET HANSA HERKKU")
-            & (df["Delivery Note Date"] >= "2023-05-22")
-        ] = "Food Kiosk Sushibar"
+            df["Location (NS)"].loc[
+                (df["Store"] == "S-MARKET HANSA HERKKU")
+                & (df["Delivery Note Date"] >= "2023-05-22")
+            ] = "L23 Sushibar Manhattan S-Market Turku"
+            df["Department"].loc[
+                (df["Store"] == "S-MARKET HANSA HERKKU")
+                & (df["Delivery Note Date"] >= "2023-05-22")
+            ] = "Food Kiosk Sushibar"
+            df["Operating department"].loc[
+                (df["Store"] == "S-MARKET HANSA HERKKU")
+                & (df["Delivery Note Date"] >= "2023-05-22")
+            ] = "Food Kiosk Sushibar"
 
-        df["Location (NS)"].loc[
-            (df["Store"] == "PRISMA TAMPEREENTIE TURKU")
-            & (df["Delivery Note Date"] >= "2024-01-25")
-        ] = "L17 Sushibar Itäharju Prisma Turku"
-        df["Department"].loc[
-            (df["Store"] == "PRISMA TAMPEREENTIE TURKU")
-            & (df["Delivery Note Date"] >= "2024-01-25")
-        ] = "Food Kiosk Sushibar"
-        df["Operating department"].loc[
-            (df["Store"] == "PRISMA TAMPEREENTIE TURKU")
-            & (df["Delivery Note Date"] >= "2024-01-25")
-        ] = "Food Kiosk Sushibar"
+            df["Location (NS)"].loc[
+                (df["Store"] == "PRISMA TAMPEREENTIE TURKU")
+                & (df["Delivery Note Date"] >= "2024-01-25")
+            ] = "L17 Sushibar Itäharju Prisma Turku"
+            df["Department"].loc[
+                (df["Store"] == "PRISMA TAMPEREENTIE TURKU")
+                & (df["Delivery Note Date"] >= "2024-01-25")
+            ] = "Food Kiosk Sushibar"
+            df["Operating department"].loc[
+                (df["Store"] == "PRISMA TAMPEREENTIE TURKU")
+                & (df["Delivery Note Date"] >= "2024-01-25")
+            ] = "Food Kiosk Sushibar"
 
-        df["Location (NS)"].loc[
-            (df["Store"] == "PRISMA MYLLY")
-            & (df["Delivery Note Date"] >= "2023-03-06")
-            & (df["Delivery Note Date"] < "2023-06-02")
-            & (df["Sales Item Category"] == "Sushi")
-        ] = "L41 Sushibar Länsikeskus Prisma Turku"
+            df["Location (NS)"].loc[
+                (df["Store"] == "PRISMA MYLLY")
+                & (df["Delivery Note Date"] >= "2023-03-06")
+                & (df["Delivery Note Date"] < "2023-06-02")
+                & (df["Sales Item Category"] == "Sushi")
+            ] = "L41 Sushibar Länsikeskus Prisma Turku"
 
-        df["Department"].loc[
-            (df["Store"] == "MESTARIN HERKKU")
-            & (df["Location (NS)"] == "L84 Itsudemo Sokkari Jyväskylä")
-        ] = "Restaurant"
-        df["Operating department"].loc[
-            (df["Store"] == "MESTARIN HERKKU")
-            & (df["Location (NS)"] == "L84 Itsudemo Sokkari Jyväskylä")
-        ] = "Restaurant"
+            df["Department"].loc[
+                (df["Store"] == "MESTARIN HERKKU")
+                & (df["Location (NS)"] == "L84 Itsudemo Sokkari Jyväskylä")
+            ] = "Restaurant"
+            df["Operating department"].loc[
+                (df["Store"] == "MESTARIN HERKKU")
+                & (df["Location (NS)"] == "L84 Itsudemo Sokkari Jyväskylä")
+            ] = "Restaurant"
 
-        df["Location (NS)"].loc[
-            (df["Customer code and name"].str.contains("TURUN OSUUSKAUPPA", case=False))
-            & (df["Delivery Note Date"] >= "2023-08-01")
-            & (df["Sales Item Category"] == "Firewok")
-        ] = "L23 Sushibar Manhattan S-Market Turku"
-        df["Location (NS)"].loc[
-            (df["Store"] == "PRISMA ITÄHARJU")
-            & (df["Delivery Note Date"] >= "2024-05-13")
-            & (df["Sales Item Category"] == "Firewok")
-        ] = "L17 Sushibar Itäharju Prisma Turku"
+            df["Location (NS)"].loc[
+                (df["Customer code and name"].str.contains("TURUN OSUUSKAUPPA", case=False))
+                & (df["Delivery Note Date"] >= "2023-08-01")
+                & (df["Sales Item Category"] == "Firewok")
+            ] = "L23 Sushibar Manhattan S-Market Turku"
+            df["Location (NS)"].loc[
+                (df["Store"] == "PRISMA ITÄHARJU")
+                & (df["Delivery Note Date"] >= "2024-05-13")
+                & (df["Sales Item Category"] == "Firewok")
+            ] = "L17 Sushibar Itäharju Prisma Turku"
 
-        df["Location (NS)"].loc[
-            (df["Delivery Note Date"] >= "2023-09-01")
-            & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
-            & (df["Sales Item Category"] == "Firewok")
-        ] = "L72 Firewok Kaari Helsinki"
-        df["Department"].loc[
-            (df["Delivery Note Date"] >= "2023-09-01")
-            & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
-            & (df["Sales Item Category"] == "Firewok")
-        ] = "Restaurant"
-        df["Operating department"].loc[
-            (df["Delivery Note Date"] >= "2023-09-01")
-            & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
-            & (df["Sales Item Category"] == "Firewok")
-        ] = "Restaurant"
-        df["Class"].loc[
-            (df["Delivery Note Date"] >= "2023-09-01")
-            & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
-            & (df["Sales Item Category"] == "Firewok")
-        ] = "Firewok"
+            df["Location (NS)"].loc[
+                (df["Delivery Note Date"] >= "2023-09-01")
+                & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
+                & (df["Sales Item Category"] == "Firewok")
+            ] = "L72 Firewok Kaari Helsinki"
+            df["Department"].loc[
+                (df["Delivery Note Date"] >= "2023-09-01")
+                & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
+                & (df["Sales Item Category"] == "Firewok")
+            ] = "Restaurant"
+            df["Operating department"].loc[
+                (df["Delivery Note Date"] >= "2023-09-01")
+                & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
+                & (df["Sales Item Category"] == "Firewok")
+            ] = "Restaurant"
+            df["Class"].loc[
+                (df["Delivery Note Date"] >= "2023-09-01")
+                & (df["Location (NS)"] == "L43 Sushibar Kaari Prisma Helsinki")
+                & (df["Sales Item Category"] == "Firewok")
+            ] = "Firewok"
 
-        df["Location (NS)"].loc[
-            (df["Delivery Note Date"] >= "2024-03-04")
-            & (df["Location (NS)"] == "L9 Sushibar Linnainmaa Prisma Tampere")
-            & (df["Sales Item Category"] == "Firewok")
-        ] = "L29 Sushibar Pirkkala Prisma Pirkkala"
+            df["Location (NS)"].loc[
+                (df["Delivery Note Date"] >= "2024-03-04")
+                & (df["Location (NS)"] == "L9 Sushibar Linnainmaa Prisma Tampere")
+                & (df["Sales Item Category"] == "Firewok")
+            ] = "L29 Sushibar Pirkkala Prisma Pirkkala"
 
-        # # Process the factory delivery data for R, K type customer
-        # if rk_data != None:
-        #     df_rk = pd.read_csv(rk_data, sep=",").fillna(0)
-        #     if df_rk.empty != True:
-        #         df_rk = df_rk.rename(
-        #             columns={
-        #                 "Date": "Delivery Note Date",
-        #                 "Customer": "Store",
-        #                 "ean": "EAN",
-        #                 "Product": "Product Name",
-        #                 "Quantity": "Quantity",
-        #             }
-        #         )
-        #         columns_titles = [
-        #             "Delivery Note Date",
-        #             "Store",
-        #             "EAN",
-        #             "Product Name",
-        #             "Quantity",
-        #         ]
-        #         df_rk = df_rk.reindex(columns=columns_titles)
 
-        #         df_rk["Delivery Note Date"] = pd.to_datetime(
-        #             df_rk["Delivery Note Date"], format="%Y-%m-%d"
-        #         )
+            df = df.sort_values(
+                by=["Store", "Delivery Note Date"], ascending=True
+            ).reset_index()
+            split_df = df.loc[df["split_month"] == True]
+            split_df["month"] = split_df["Delivery Note Date"].dt.month
+            if len(split_df.month.unique()) == 2:
+                before, after = (
+                    split_df.month.unique().tolist()[0],
+                    split_df.month.unique().tolist()[1],
+                )
+                moved_df = split_df.loc[split_df["month"] == after]
+                df = df.drop(index=moved_df.index)
+                df = pd.concat(
+                    [add_position(df, "Store"), add_position(moved_df, "Store")], axis=0
+                )
+            else:
+                df = add_position(df, "Store")
 
-        #         df_rk["Sales Unit"] = df_rk["EAN"].map(
-        #             dict(zip(master_sale_item["EAN"], master_sale_item["Sale Units"]))
-        #         )
-        #         df_rk["Customer code and name"] = df_rk["Store"].map(
-        #             dict(zip(master_customer["addr1"], master_customer["ID+Name"]))
-        #         )
-        #         df_rk["Tax code internalID"] = df_rk["Customer code and name"].map(
-        #             dict(
-        #                 zip(
-        #                     master_customer["ID+Name"],
-        #                     master_customer["Tax code internalID"],
-        #                 )
-        #             )
-        #         )
-        #         df_rk["Sales Item Internal ID"] = df_rk["EAN"].map(
-        #             dict(
-        #                 zip(
-        #                     master_sale_item["EAN"],
-        #                     master_sale_item["Internal ID PROD"],
-        #                 )
-        #             )
-        #         )
-        #         df_rk["Sales Item Category"] = df_rk["EAN"].map(
-        #             dict(
-        #                 zip(master_sale_item["EAN"], master_sale_item["Item Category"])
-        #             )
-        #         )
-        #         df_rk["Department"] = df_rk["EAN"].map(
-        #             dict(zip(master_sale_item["EAN"], master_sale_item["Department"]))
-        #         )
-        #         df_rk["Class"] = df_rk["EAN"].map(
-        #             dict(zip(master_sale_item["EAN"], master_sale_item["Class"]))
-        #         )
-        #         df_rk["split_month"] = df_rk["Customer code and name"].map(
-        #             dict(
-        #                 zip(master_customer["ID+Name"], master_customer["split_month"])
-        #             )
-        #         )
-
-        #         df_rk["Unit Price"] = np.nan
-        #         df_rk.loc[df_rk["Store"].str.startswith("K"), "Unit Price"] = df_rk[
-        #             "EAN"
-        #         ].map(
-        #             dict(
-        #                 zip(
-        #                     master_sale_item["EAN"],
-        #                     master_sale_item["Price - K (alv0)"],
-        #                 )
-        #             )
-        #         )
-        #         df_rk.loc[df_rk["Store"].str.startswith("R"), "Unit Price"] = df_rk[
-        #             "EAN"
-        #         ].map(
-        #             dict(
-        #                 zip(
-        #                     master_sale_item["EAN"],
-        #                     master_sale_item["Price - R (alv0)"],
-        #                 )
-        #             )
-        #         )
-        #         df_rk["Amount"] = df_rk["Unit Price"] * df_rk["Quantity"]
-
-        #         grouped_rk = (
-        #             df_rk.groupby(["Store", "Delivery Note Date"])
-        #             .sum()["Amount"]
-        #             .unstack()
-        #             * 1.14
-        #         )
-
-        #         daily_delivery_sales_vat = (
-        #             grouped_rk.reset_index()
-        #             .melt(["Store"])
-        #             .dropna()
-        #             .rename(columns={"value": "Amount (alv14)"})
-        #         )
-        #         daily_delivery_sales_vat["delivery_minimum"] = daily_delivery_sales_vat[
-        #             "Store"
-        #         ].map(
-        #             dict(
-        #                 zip(
-        #                     master_customer["addr1"],
-        #                     master_customer["delivery_minimum"],
-        #                 )
-        #             )
-        #         )
-        #         daily_delivery_sales_vat["Amount"] = daily_delivery_sales_vat[
-        #             "Store"
-        #         ].map(
-        #             dict(zip(master_customer["addr1"], master_customer["delivery_fee"]))
-        #         )
-
-        #         delivery_fee_df = daily_delivery_sales_vat.drop(
-        #             daily_delivery_sales_vat[
-        #                 daily_delivery_sales_vat["Amount (alv14)"]
-        #                 > daily_delivery_sales_vat["delivery_minimum"]
-        #             ].index
-        #         )
-        #         delivery_fee_df["Product Name"] = "Delivery fee"
-        #         delivery_fee_df["Quantity"] = 1
-        #         delivery_fee_df["Sales Unit"] = "KPL"
-        #         delivery_fee_df["Customer code and name"] = delivery_fee_df[
-        #             "Store"
-        #         ].map(dict(zip(master_customer["addr1"], master_customer["ID+Name"])))
-        #         delivery_fee_df["Tax code internalID"] = 6
-        #         delivery_fee_df["Sales Item Internal ID"] = 4784
-        #         delivery_fee_df["Unit Price"] = (
-        #             delivery_fee_df["Amount"] / delivery_fee_df["Quantity"]
-        #         )
-        #         delivery_fee_df["Department"] = "Food Plant"
-        #         delivery_fee_df["Class"] = "Itsudemo"
-        #         delivery_fee_df["split_month"] = "False"
-        #         delivery_fee_df = delivery_fee_df.drop(
-        #             ["Amount (alv14)", "delivery_minimum"], axis=1
-        #         )
-
-        #         df_rk = pd.concat([df_rk, delivery_fee_df], axis=0)
-
-        #         df_rk = df_rk.drop(df_rk[df_rk["Store"] == "Rose Chen"].index)
-        #         df_rk = df_rk.drop(df_rk[df_rk["Store"] == "Itsudemo Lippulaiva"].index)
-        #         df_rk = df_rk.drop(df_rk[df_rk["Store"] == "Itsudemo Nihtisilta"].index)
-        #         df_rk = df_rk.drop(df_rk[df_rk["Store"] == "Itsuyaki Lahti"].index)
-        #         df_rk = df_rk.drop(df_rk[df_rk["Store"] == "Firewok Lippulaiva"].index)
-        #         df_rk = df_rk.drop(df_rk[df_rk["Store"] == "Firewok Duo"].index)
-
-        #         df_rk["Operating department"] = "Food Plant"
-        #         df_rk["Location (NS)"] = "L102 Food Plant Espoo"
-        #         df = pd.concat([df, df_rk], axis=0)
-
-        df = df.sort_values(
-            by=["Store", "Delivery Note Date"], ascending=True
-        ).reset_index()
-        split_df = df.loc[df["split_month"] == True]
-        split_df["month"] = split_df["Delivery Note Date"].dt.month
-        if len(split_df.month.unique()) == 2:
-            before, after = (
-                split_df.month.unique().tolist()[0],
-                split_df.month.unique().tolist()[1],
+            st.markdown(
+                "### Following data will be removed, please check if there is any unclassified data"
             )
-            moved_df = split_df.loc[split_df["month"] == after]
-            df = df.drop(index=moved_df.index)
-            df = pd.concat(
-                [add_position(df, "Store"), add_position(moved_df, "Store")], axis=0
+            st.dataframe(
+                df[
+                    (df["Operating department"].isnull())
+                    | (df["Customer code and name"].isnull())
+                    | (df["Location (NS)"].isnull())
+                    | (df["Sales Item Internal ID"].isnull())
+                ].reset_index(),
+                1500,
+                1000,
+                use_container_width=True,
             )
-        else:
-            df = add_position(df, "Store")
 
-        st.markdown(
-            "### Following data will be removed, please check if there is any unclassified data"
-        )
-        st.dataframe(
-            df[
+            nan = df[
                 (df["Operating department"].isnull())
                 | (df["Customer code and name"].isnull())
                 | (df["Location (NS)"].isnull())
                 | (df["Sales Item Internal ID"].isnull())
-            ].reset_index(),
-            1500,
-            1000,
-            use_container_width=True,
-        )
+            ].index
+            new_df = df.drop(index=nan, inplace=True)
+            new_df = df.drop(df[df["Operating department"] == "Delivery"].index)
+            # new_df = new_df.drop(new_df[(new_df['Store'].isin(['PRISMA HALIKKO','PRISMA NUMMELA'])) & (new_df['Product Name'] == 'FIREWOK BUFFET')].index)
 
-        nan = df[
-            (df["Operating department"].isnull())
-            | (df["Customer code and name"].isnull())
-            | (df["Location (NS)"].isnull())
-            | (df["Sales Item Internal ID"].isnull())
-        ].index
-        new_df = df.drop(index=nan, inplace=True)
-        new_df = df.drop(df[df["Operating department"] == "Delivery"].index)
-        # new_df = new_df.drop(new_df[(new_df['Store'].isin(['PRISMA HALIKKO','PRISMA NUMMELA'])) & (new_df['Product Name'] == 'FIREWOK BUFFET')].index)
+            new_df["Sales Item Internal ID"] = new_df["Sales Item Internal ID"].astype(int)
+            new_df["Tax code internalID"] = new_df["Tax code internalID"].astype(int)
+            # new_df['EAN'] = new_df['EAN'].astype(int, errors='ignore')
+            new_df.insert(0, "ExternalID", 0)
+            # new_df = new_df.sort_values(by=["Store", "Delivery Note Date"], ascending=True).reset_index(drop=True)
+            new_df["next"] = new_df[["Store"]].shift(1)
 
-        new_df["Sales Item Internal ID"] = new_df["Sales Item Internal ID"].astype(int)
-        new_df["Tax code internalID"] = new_df["Tax code internalID"].astype(int)
-        # new_df['EAN'] = new_df['EAN'].astype(int, errors='ignore')
-        new_df.insert(0, "ExternalID", 0)
-        # new_df = new_df.sort_values(by=["Store", "Delivery Note Date"], ascending=True).reset_index(drop=True)
-        new_df["next"] = new_df[["Store"]].shift(1)
+            new_df["ExternalID"] = (
+                new_df["Store"] != new_df["next"]
+            ).cumsum() + last_externalID_ns
 
-        new_df["ExternalID"] = (
-            new_df["Store"] != new_df["next"]
-        ).cumsum() + last_externalID_ns
-
-        new_df["month"] = new_df["Delivery Note Date"].dt.month
-        new_df["year"] = new_df["Delivery Note Date"].dt.year
-        new_df["Term"] = new_df["Customer code and name"].map(
-            dict(zip(master_customer["ID+Name"], master_customer["terms"]))
-        )
-
-        last_day_externaliID = (
-            new_df.sort_values("Delivery Note Date")
-            .groupby("ExternalID")
-            .tail(1)[["ExternalID", "Delivery Note Date"]]
-        )
-
-        last_day_externaliID_dict = dict(
-            zip(
-                last_day_externaliID["ExternalID"],
-                last_day_externaliID["Delivery Note Date"],
-            )
-        )
-
-        # new_df['invoice_date']=new_df['ExternalID'].map(last_day_externaliID_dict)
-        new_df["invoice_date"] = pd.Timestamp.now()
-
-        new_df["due_date"] = new_df["invoice_date"] + pd.to_timedelta(
-            new_df["Term"], unit="D"
-        )
-        week_num = list(new_df["Delivery Note Date"].tail(1).dt.isocalendar().week)[0]
-        if len(new_df.year.unique()) == 2:
-            start_of_week, end_of_week = get_start_and_end_date_from_calendar_week(
-                pd.Timestamp.now().year - 1, week_num
-            )
-        else:
-            start_of_week, end_of_week = get_start_and_end_date_from_calendar_week(
-                pd.Timestamp.now().year, week_num
+            new_df["month"] = new_df["Delivery Note Date"].dt.month
+            new_df["year"] = new_df["Delivery Note Date"].dt.year
+            new_df["Term"] = new_df["Customer code and name"].map(
+                dict(zip(master_customer["ID+Name"], master_customer["terms"]))
             )
 
-        new_df["invoice_text_1"] = (
-            f"{start_of_week.strftime('%d.%m')}-{end_of_week.strftime('%d.%m.%Y')} - Week {week_num}"
-        )
-
-        if len(new_df.month.unique()) == 2:
-            prev_month_last_day = datetime.date(
-                start_of_week.year,
-                start_of_week.month,
-                calendar.monthrange(start_of_week.year, start_of_week.month)[1],
-            )
-            this_month_first_day = datetime.date(end_of_week.year, end_of_week.month, 1)
-            new_df.loc[
-                (new_df["month"] == start_of_week.month)
-                & (new_df["split_month"] == True),
-                "invoice_text_1",
-            ] = f"{start_of_week.strftime('%d.%m')}-{prev_month_last_day.strftime('%d.%m.%Y')} - Week {week_num}"
-            new_df.loc[
-                (new_df["month"] == end_of_week.month)
-                & (new_df["split_month"] == True),
-                "invoice_text_1",
-            ] = f"{this_month_first_day.strftime('%d.%m')}-{end_of_week.strftime('%d.%m.%Y')} - Week {week_num}"
-            new_df["invoice_date"].loc[
-                (new_df["split_month"] == True)
-                & (new_df["month"] == start_of_week.month)
-            ] = (new_df["invoice_text_1"].str.split("-", expand=True)[1].str.strip())
-
-        col1, col2 = st.columns([1, 1])
-
-        with col1:
-            st.header("Download CSV file")
-
-            total_wo_vat = new_df["Amount"].sum()
-            df_without_converting_decimal = new_df.copy()
-            new_df = new_df.replace([np.inf, -np.inf], 0)
-            new_df["Unit Price"] = new_df["Unit Price"].fillna(0)
-            new_df["Quantity"] = (
-                new_df["Quantity"]
-                .round(decimals=2)
-                .astype(str)
-                .str.replace(".", ",", regex=False)
-            )
-            new_df["Amount"] = (
-                new_df["Amount"]
-                .round(decimals=2)
-                .astype(str)
-                .str.replace(".", ",", regex=False)
-            )
-            new_df["Unit Price"] = (
-                new_df["Unit Price"]
-                .round(decimals=2)
-                .astype(str)
-                .str.replace(".", ",", regex=False)
-            )
-            new_df["Delivery Note Date"] = new_df["Delivery Note Date"].dt.strftime(
-                "%d.%m.%Y"
-            )
-            new_df["invoice_date"] = new_df["invoice_date"].dt.strftime("%d.%m.%Y")
-            new_df["due_date"] = new_df["due_date"].dt.strftime("%d.%m.%Y")
-
-            new_df = new_df.drop(
-                [
-                    "index",
-                    "next",
-                    "ALV14",
-                    "Commission Rate",
-                    "Tax Rate",
-                    "split_month",
-                    "month",
-                ],
-                axis=1,
-                errors="ignore",
+            last_day_externaliID = (
+                new_df.sort_values("Delivery Note Date")
+                .groupby("ExternalID")
+                .tail(1)[["ExternalID", "Delivery Note Date"]]
             )
 
-            csv = new_df.to_csv(sep=";", index=False).encode("utf-8")
-
-            st.write(f"Total (VAT0): {round(total_wo_vat,2)}")
-
-            st.download_button(
-                label="Download data as CSV",
-                data=csv,
-                file_name=f'{datetime.datetime.now(pytz.timezone("Europe/Helsinki")).strftime("%Y%m%d%H%M")}.csv',
-                mime="text/csv",
+            last_day_externaliID_dict = dict(
+                zip(
+                    last_day_externaliID["ExternalID"],
+                    last_day_externaliID["Delivery Note Date"],
+                )
             )
 
-        st.write(new_df)
-        with col2:
-            st.header("Send sales data to franchisee")
-            send_data_options = st.multiselect(
-                "Stores that you need to send sales data?",
-                list(np.unique(np.array(new_df["Location (NS)"]))),
-                [
-                    "L56 Sushibar Lippulaiva Prisma Espoo",
-                    "L36 Sushibar Syke Prisma Lahti",
-                ],
+            # new_df['invoice_date']=new_df['ExternalID'].map(last_day_externaliID_dict)
+            new_df["invoice_date"] = pd.Timestamp.now()
+
+            new_df["due_date"] = new_df["invoice_date"] + pd.to_timedelta(
+                new_df["Term"], unit="D"
+            )
+            week_num = list(new_df["Delivery Note Date"].tail(1).dt.isocalendar().week)[0]
+            if len(new_df.year.unique()) == 2:
+                start_of_week, end_of_week = get_start_and_end_date_from_calendar_week(
+                    pd.Timestamp.now().year - 1, week_num
+                )
+            else:
+                start_of_week, end_of_week = get_start_and_end_date_from_calendar_week(
+                    pd.Timestamp.now().year, week_num
+                )
+
+            new_df["invoice_text_1"] = (
+                f"{start_of_week.strftime('%d.%m')}-{end_of_week.strftime('%d.%m.%Y')} - Week {week_num}"
             )
 
-            if st.button("Send"):
-                for i in send_data_options:
-                    try:
-                        receiver = master_location.loc[
-                            master_location["Location (NS)"] == i
-                        ]["email"].values[0]
-                        data_to_be_send = pd.pivot_table(
-                            df_without_converting_decimal.loc[
-                                df_without_converting_decimal["Location (NS)"] == i
-                            ],
-                            values=["Amount"],
-                            index=["Delivery Note Date"],
-                            columns=["Sales Item Category"],
-                            aggfunc="sum",
-                            fill_value=0,
-                            margins=True,
-                            #    dropna=True,
-                            margins_name="Total",
-                            #    observed=False
-                        )
+            if len(new_df.month.unique()) == 2:
+                prev_month_last_day = datetime.date(
+                    start_of_week.year,
+                    start_of_week.month,
+                    calendar.monthrange(start_of_week.year, start_of_week.month)[1],
+                )
+                this_month_first_day = datetime.date(end_of_week.year, end_of_week.month, 1)
+                new_df.loc[
+                    (new_df["month"] == start_of_week.month)
+                    & (new_df["split_month"] == True),
+                    "invoice_text_1",
+                ] = f"{start_of_week.strftime('%d.%m')}-{prev_month_last_day.strftime('%d.%m.%Y')} - Week {week_num}"
+                new_df.loc[
+                    (new_df["month"] == end_of_week.month)
+                    & (new_df["split_month"] == True),
+                    "invoice_text_1",
+                ] = f"{this_month_first_day.strftime('%d.%m')}-{end_of_week.strftime('%d.%m.%Y')} - Week {week_num}"
+                new_df["invoice_date"].loc[
+                    (new_df["split_month"] == True)
+                    & (new_df["month"] == start_of_week.month)
+                ] = (new_df["invoice_text_1"].str.split("-", expand=True)[1].str.strip())
 
-                        if pd.notna(receiver):
-                            data_to_be_send = data_to_be_send.round(2)
-                            st.write(
-                                f"Sending {i} week {week_num} sales data to {receiver}"
+            col1, col2 = st.columns([1, 1])
+
+            with col1:
+                st.header("Download CSV file")
+
+                total_wo_vat = new_df["Amount"].sum()
+                df_without_converting_decimal = new_df.copy()
+                new_df = new_df.replace([np.inf, -np.inf], 0)
+                new_df["Unit Price"] = new_df["Unit Price"].fillna(0)
+                new_df["Quantity"] = (
+                    new_df["Quantity"]
+                    .round(decimals=2)
+                    .astype(str)
+                    .str.replace(".", ",", regex=False)
+                )
+                new_df["Amount"] = (
+                    new_df["Amount"]
+                    .round(decimals=2)
+                    .astype(str)
+                    .str.replace(".", ",", regex=False)
+                )
+                new_df["Unit Price"] = (
+                    new_df["Unit Price"]
+                    .round(decimals=2)
+                    .astype(str)
+                    .str.replace(".", ",", regex=False)
+                )
+                new_df["Delivery Note Date"] = new_df["Delivery Note Date"].dt.strftime(
+                    "%d.%m.%Y"
+                )
+                new_df["invoice_date"] = new_df["invoice_date"].dt.strftime("%d.%m.%Y")
+                new_df["due_date"] = new_df["due_date"].dt.strftime("%d.%m.%Y")
+
+                new_df = new_df.drop(
+                    [
+                        "index",
+                        "next",
+                        "ALV14",
+                        "Commission Rate",
+                        "Tax Rate",
+                        "split_month",
+                        "month",
+                    ],
+                    axis=1,
+                    errors="ignore",
+                )
+
+                csv = new_df.to_csv(sep=";", index=False).encode("utf-8")
+
+                st.write(f"Total (VAT0): {round(total_wo_vat,2)}")
+
+                st.download_button(
+                    label="Download data as CSV",
+                    data=csv,
+                    file_name=f'{datetime.datetime.now(pytz.timezone("Europe/Helsinki")).strftime("%Y%m%d%H%M")}.csv',
+                    mime="text/csv",
+                )
+
+            with col2:
+                st.header("Send sales data to franchisee")
+                send_data_options = st.multiselect(
+                    "Stores that you need to send sales data?",
+                    list(np.unique(np.array(new_df["Location (NS)"]))),
+                    [
+                        "L56 Sushibar Lippulaiva Prisma Espoo",
+                        "L36 Sushibar Syke Prisma Lahti",
+                    ],
+                )
+
+                if st.button("Send"):
+                    for i in send_data_options:
+                        try:
+                            receiver = master_location.loc[
+                                master_location["Location (NS)"] == i
+                            ]["email"].values[0]
+                            data_to_be_send = pd.pivot_table(
+                                df_without_converting_decimal.loc[
+                                    df_without_converting_decimal["Location (NS)"] == i
+                                ],
+                                values=["Amount"],
+                                index=["Delivery Note Date"],
+                                columns=["Sales Item Category"],
+                                aggfunc="sum",
+                                fill_value=0,
+                                margins=True,
+                                #    dropna=True,
+                                margins_name="Total",
+                                #    observed=False
                             )
-                            send_email(
-                                receiver,
-                                f"Week {week_num} sales - {i}",
-                                data_to_be_send,
-                            )
-                        else:
-                            st.write(
-                                f"Cannot find email address for receiving {i}'s sales data"
-                            )
-                    except:
-                        pass
-                st.balloons()
+
+                            if pd.notna(receiver):
+                                data_to_be_send = data_to_be_send.round(2)
+                                st.write(
+                                    f"Sending {i} week {week_num} sales data to {receiver}"
+                                )
+                                send_email(
+                                    receiver,
+                                    f"Week {week_num} sales - {i}",
+                                    data_to_be_send,
+                                )
+                            else:
+                                st.write(
+                                    f"Cannot find email address for receiving {i}'s sales data"
+                                )
+                        except:
+                            pass
+                    st.balloons()
 
 
 with delivery_data:
     # Input field for NS external ID
     last_externalID_ns = int(
         st.number_input(
-            "Insert last Internal ID in NetSuite.", step=1, key="delivery_external_id"
+            "Insert last Internal ID in NetSuite.",
+            step=1,
+            key="delivery_external_id"
         )
     )
 
@@ -825,12 +666,8 @@ with delivery_data:
             var_name="store",
             value_name="Quantity",
         )
-        # melted_df['date'] = pd.to_datetime(melted_df['date']).dt.date
         melted_df["date"] = pd.to_datetime(melted_df["date"])
-
         merged_df = pd.merge(melted_df, delivery_price, on=["date", "store"])
-
-        # fi_data = merged_df.loc[~merged_df['location_internal_id'].isin([103,104,105,309,310,85])]
         fi_data = merged_df.copy()
 
         fi_data["Product Name"] = "SOK delivery sales"

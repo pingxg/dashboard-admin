@@ -5,7 +5,7 @@ from utils.send_email import send_email
 from utils.db_query import get_row_number, init_connection
 from utils.utilities import auth_widgets
 from sqlalchemy import text
-
+from io import BytesIO
 st.set_page_config(layout="wide")
 
 auth_widgets()
@@ -19,7 +19,7 @@ with con.connect() as conn:
 
 raw_data = st.file_uploader("Upload delivery data", type='xlsx')
 if raw_data is not None:
-    df = pd.read_excel(raw_data, engine='openpyxl')
+    df = pd.read_excel(BytesIO(raw_data), engine='openpyxl')
     df = df.fillna(0)
     df['date'] = pd.to_datetime(df['date']).dt.date
     for i in delivery_store:
