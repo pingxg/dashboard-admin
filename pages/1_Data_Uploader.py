@@ -5,6 +5,7 @@ import warnings
 import pandas as pd
 import sqlalchemy as db
 import streamlit as st
+import numpy as np
 from utils.db_query import init_connection, custom_query
 from utils.get_master_data import LOCATION_MASTER, get_master_data
 from utils.send_email import send_email
@@ -51,7 +52,7 @@ vendor_type = {
 def file_uploader(label, type="csv", country="FI", sep=";", help=None, allow_multiple=False):
     df = None
     try:
-        data = st.file_uploader(f'Upload {label.replace("_"," ")}', type=type, help=help, key=f"{label}_up",accept_multiple_files=allow_multiple)
+        data = st.file_uploader(f'Upload {label.replace("_"," ")}', type=type, help=help, key=f"{label}_up", accept_multiple_files=allow_multiple)
         if data:
             if type == "csv" or type == "CSV":
                 if label == "month_data" or label == "financial_data":
@@ -67,30 +68,30 @@ def file_uploader(label, type="csv", country="FI", sep=";", help=None, allow_mul
                     if isinstance(data, list):
                         output = pd.DataFrame()
                         for file in data:
-                            df = pd.read_excel(BytesIO(file), engine='openpyxl')
+                            df = pd.read_excel(BytesIO(file.read()), engine='openpyxl')  # Convert to bytes-like object
                             output = pd.concat([df, output], sort=False)
                         df = output.copy()
                 elif label in ["month_data", "financial_data"] and country == "EE":
-                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data.read()), engine='openpyxl')  # Convert to bytes-like object
                 elif label in ["month_data", "financial_data"] and country == "NO":
-                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data.read()), engine='openpyxl')  # Convert to bytes-like object
                 elif label == "invoice_data" and country == "EE":
-                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data.read()), engine='openpyxl')  # Convert to bytes-like object
                 if label == "sales_data" and country == "EE":
                     if isinstance(data, list):
                         output = pd.DataFrame()
                         for file in data:
-                            df = pd.read_excel(BytesIO(file), engine='openpyxl')
+                            df = pd.read_excel(BytesIO(file.read()), engine='openpyxl')  # Convert to bytes-like object
                             df.dropna(how='all', inplace=True, axis=0)
                             df.dropna(how='any', inplace=True, axis=1)
-                            df.columns = ['store_name', 'date', 'ean_name', '_amount', '_amount_vat','quantity']
+                            df.columns = ['store_name', 'date', 'ean_name', '_amount', '_amount_vat', 'quantity']
                             output = pd.concat([df, output], sort=False)
 
                         df = output.copy()
                     else:
-                        df = pd.read_excel(BytesIO(data), engine='openpyxl')
+                        df = pd.read_excel(BytesIO(data.read()), engine='openpyxl')  # Convert to bytes-like object
                 if label == "s_card_purchase_data":
-                    df = pd.read_excel(BytesIO(data), engine='openpyxl')
+                    df = pd.read_excel(BytesIO(data.read()), engine='openpyxl')  # Convert to bytes-like object
                     
             elif type == "txt" or type == "TXT":
                 if label == "purchase_data":
@@ -205,9 +206,9 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
             if country == "FI" and month is not None and year is not None:
                 upload_df = df.copy()
                 upload_df.columns = upload_df.columns.str.strip()
-                upload_df['Financial Row'] = upload_df['Financial Row'].replace('  ',pd.np.nan)
+                upload_df['Financial Row'] = upload_df['Financial Row'].replace('  ', np.nan)
                 upload_df = upload_df.dropna()
-                upload_df[['account_id','account_desc']] = upload_df['Financial Row'].str.split(' - ',expand=True)
+                upload_df[['account_id', 'account_desc']] = upload_df['Financial Row'].str.split(' - ', expand=True)
                 upload_df['account_id'] = pd.to_numeric(upload_df['account_id'], errors='coerce')
                 upload_df = upload_df.dropna().reset_index()
                 upload_df['account_id'] = upload_df['account_id'].astype(int)
@@ -330,7 +331,9 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df['date'] = pd.to_datetime(upload_df['Date'],format='%d.%m.%Y')
                 upload_df['vendor'] = upload_df['Vendor']
                 upload_df['inv_num'] = upload_df['Document Number/ID']
-                upload_df['location_internal_id'] = upload_df['Location'].map(dict(zip(location_master_data['Location (NS)'],location_master_data['Internal ID']))).astype(int)
+                
+                # upload_df['location_internal_id'] = upload_df['Location'].map(dict(zip(location_master_data['Location (NS)'],location_master_data['Internal ID']))).astype(int)
+                upload_df['location_internal_id'] = upload_df['Location'].str.extract('(\d+)').astype(int)
                 upload_df['account_type'] = upload_df['account_id'].map(dict(zip(account_master_data['account_id'],account_master_data['account_type'].str.capitalize())))
                 upload_df['vendor_type'] =  upload_df['vendor'].map(vendor_type)
                 # upload_df =  upload_df.loc[upload_df['account_type']=="Material"]
