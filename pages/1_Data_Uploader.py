@@ -30,7 +30,6 @@ location_master_data = LOCATION_MASTER[['Location (NS)', 'Internal ID']].dropna(
 location_master_data_name2id = LOCATION_MASTER[['Ketjuyksikkö (SOK)', 'Internal ID']].dropna().drop_duplicates()
 product_master_data = PRODUCT_MASTER[['EAN', 'Item Category', 'Sale Units', 'Internal ID PROD']]
 product_master_data = product_master_data.dropna().drop_duplicates()
-# account_master_data = get_master_data('AccountID')
 
 account_master_data = custom_query("SELECT * FROM master.financial_account")
 
