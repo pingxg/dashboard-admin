@@ -123,9 +123,11 @@ with sok_data:
             df["Quantity"] = (
                 df["Quantity"].astype(str).str.replace(",", ".").astype(float)
             )  # replace all the "," to "." in the value
-            df["Delivery Note Date"] = pd.to_datetime(
-                df["Delivery Note Date"], format="%d.%m.%Y"
-            )
+            df['Delivery Note Date'] = df['Delivery Note Date'].astype(str).str.replace(r"[^\d\.]", "", regex=True)
+            df['Delivery Note Date'] = pd.to_datetime(df['Delivery Note Date'], format="%d.%m.%Y", errors="coerce")
+            # df["Delivery Note Date"] = pd.to_datetime(
+            #     df["Delivery Note Date"], format="%d.%m.%Y"
+            # )
             df = df.sort_values(by="Store")
 
             # -----------------------------
