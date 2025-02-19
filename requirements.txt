@@ -5,7 +5,7 @@ prophet==1.1.5
 SharePlum==0.5.1
 openpyxl==3.1.5
 sqlalchemy==2.0.35
-mysql-connector-python==9.0.0
+mysql-connector-python==9.1.0
 streamlit-aggrid==1.0.5
 streamlit-authenticator==0.1.5
 numpy==2.1.1
