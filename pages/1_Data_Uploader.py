@@ -10,7 +10,6 @@ from utils.db_query import init_connection, custom_query
 from utils.get_master_data import LOCATION_MASTER, get_master_data
 from utils.send_email import send_email
 from utils.utilities import auth_widgets
-from sqlalchemy import text
 from io import BytesIO
 
 
@@ -28,7 +27,7 @@ if 'upload_history' not in st.session_state:
 PRODUCT_MASTER = get_master_data('SalesItem')
 location_master_data = LOCATION_MASTER[['Location (NS)', 'Internal ID']].dropna().drop_duplicates()
 location_master_data_name2id = LOCATION_MASTER[['Ketjuyksikkö (SOK)', 'Internal ID']].dropna().drop_duplicates()
-product_master_data = PRODUCT_MASTER[['EAN', 'Item Category', 'Sale Units', 'Internal ID PROD']]
+product_master_data = PRODUCT_MASTER[['EAN', 'Item Category', 'Sale Units', 'Internal ID PROD', 'Display Name/code']]
 product_master_data = product_master_data.dropna().drop_duplicates()
 
 account_master_data = custom_query("SELECT * FROM master.financial_account")
@@ -81,17 +80,39 @@ def file_uploader(label, type="csv", country="FI", sep=";", help=None, allow_mul
                         output = pd.DataFrame()
                         for file in data:
                             df = pd.read_excel(BytesIO(file.read()), engine='openpyxl')  # Convert to bytes-like object
-                            df.dropna(how='all', inplace=True, axis=0)
-                            df.dropna(how='any', inplace=True, axis=1)
-                            df.columns = ['store_name', 'date', 'ean_name', '_amount', '_amount_vat', 'quantity']
+
+                            df = df.iloc[2:]
+                            df = df.reset_index(drop=True)
+                            # drop the columns if the first row is empty
+                            df = df.loc[:, df.iloc[0].notna()]
+
+
+                            # promot the first row to header
+                            df.columns = df.iloc[0]
+                            df.columns = df.columns.str.lower()
+                            column_mapping = {
+                                "store": "store_name",
+                                "date": "date",
+                                "product name": "product_name",
+                                "sales excluding vat": "_amount",
+                                "sales including vat": "_amount_vat",
+                                "sales quantity": "quantity",
+                            }
+                            df.rename(columns=column_mapping, inplace=True)
+                            df = df.iloc[1:]
+                            
+                            # remove the row with the empty amount for column "prouct_name"
+                            df = df[df['product_name'].notna()]
+                            df = df.reset_index(drop=True)
+                            
+                            # downfill all the empty values
+                            df = df.ffill()
                             output = pd.concat([df, output], sort=False)
 
                         df = output.copy()
                     else:
                         df = pd.read_excel(BytesIO(data.read()), engine='openpyxl')  # Convert to bytes-like object
-                if label == "s_card_purchase_data":
-                    df = pd.read_excel(BytesIO(data.read()), engine='openpyxl')  # Convert to bytes-like object
-                    
+
             elif type == "txt" or type == "TXT":
                 if label == "purchase_data":
                     df = pd.read_csv(data, sep=sep, skiprows=4)
@@ -140,36 +161,67 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                     upload_df['upload_time'] = current_time
             elif country == "EE" :
                 upload_df = df.copy().reset_index(drop=True)
-                upload_df[["ean", "product_name"]] = upload_df['ean_name'].str.extract("(\d+) (.+)", expand=True)
-                upload_df['ean'] = upload_df['ean'].astype(int)
-                upload_df['unit'] = upload_df['ean'].map(dict(zip(product_master_data['EAN'],product_master_data['Sale Units'])))
-                upload_df['product_internal_id'] = upload_df['ean'].map(dict(zip(product_master_data['EAN'],product_master_data['Internal ID PROD'])))
-                upload_df['product_catagory'] = upload_df['ean'].map(dict(zip(product_master_data['EAN'],product_master_data['Item Category'])))
+
+                upload_df['unit'] = upload_df['product_name'].map(dict(zip(product_master_data['Display Name/code'],product_master_data['Sale Units'])))
+                upload_df['product_internal_id'] = upload_df['product_name'].map(dict(zip(product_master_data['Display Name/code'],product_master_data['Internal ID PROD'])))
+                upload_df['product_catagory'] = upload_df['product_name'].map(dict(zip(product_master_data['Display Name/code'],product_master_data['Item Category'])))
                 upload_df['location_internal_id'] = upload_df['store_name'].map(dict(zip(location_master_data_name2id['Ketjuyksikkö (SOK)'],location_master_data_name2id['Internal ID'])))
                 upload_df.dropna(inplace=True)
-                drop_rocca_delivery = upload_df.loc[(upload_df['store_name']=='PRISMA ROCCA AL MARE')&(upload_df['date']<'2022-09-26')].index
-                drop_siku_delivery = upload_df.loc[(upload_df['store_name']=='PRISMA SIKUPILLI')&(upload_df['date']<'2022-12-08')].index
+                upload_df["date"] =  pd.to_datetime(upload_df["date"]).dt.date
+
+                drop_rocca_delivery = upload_df.loc[(upload_df['store_name']=='PRISMA ROCCA AL MARE')&(upload_df['date']<pd.to_datetime('2022-09-26').date())].index
+                drop_siku_delivery = upload_df.loc[(upload_df['store_name']=='PRISMA SIKUPILLI')&(upload_df['date']<pd.to_datetime('2022-12-08').date())].index
                 drop_other_delivery = upload_df.loc[(upload_df['store_name']=='PRISMA TISKRE')|(upload_df['store_name']=='PRISMA VANALINN')|(upload_df['store_name']=='PRISMA ROO')].index
 
                 upload_df.drop(drop_rocca_delivery , inplace=True)
                 upload_df.drop(drop_siku_delivery , inplace=True)
                 upload_df.drop(drop_other_delivery , inplace=True)
+
+
+
+
+                
                 upload_df['quantity'] = upload_df['quantity'].astype(str)
                 upload_df['_amount'] = upload_df['_amount'].astype(str)
                 upload_df['location_internal_id'] = upload_df['location_internal_id'].astype(int)
                 upload_df['product_internal_id'] = upload_df['product_internal_id'].astype(int)
                 upload_df['quantity'] = upload_df['quantity'].str.replace(',', '.', regex=False).astype(float).round(decimals=2)
                 upload_df['_amount'] = upload_df['_amount'].str.replace(',', '.', regex=False).astype(float).round(decimals=2)
-                upload_df["date"] =  pd.to_datetime(upload_df["date"], format="%d.%m.%Y").dt.date
-
                 upload_df['amount'] = upload_df['_amount']*0.85
-                upload_df.drop(columns='ean_name',inplace=True, errors='ignore')
+                def generate_invoice_text(upload_df):
+                    invoice_texts = []
+                    # First group by store and month/year to handle cross-month data
+                    upload_df['month'] = pd.DatetimeIndex(upload_df['date']).month
+                    upload_df['year'] = pd.DatetimeIndex(upload_df['date']).year
+                    grouped = upload_df.groupby(['store_name', 'year', 'month'])
+
+                    for (store_name, year, month), group in grouped:
+                        # Get the date range for the current store and month
+                        start_date = group['date'].min()
+                        end_date = group['date'].max()
+                        total_amount = str((group['_amount']).sum().round(2)).replace('.', ',')
+                        total_amount_after_commission = str(group['amount'].sum().round(2)).replace('.', ',')
+                        invoice_text = f"Sushibar {start_date.day}.-{end_date.day}.{month}.{year} {store_name} {total_amount}*85%={total_amount_after_commission}"
+                        invoice_texts.append(invoice_text)
+                    invoice_texts = sorted(invoice_texts)
+
+                    return invoice_texts
+                # Generate the invoice text for the current upload_df
+                invoice_texts = generate_invoice_text(upload_df)
+                for invoice_text in invoice_texts:
+                    st.write(invoice_text)
+
+
                 upload_df.drop(columns='_amount',inplace=True, errors='ignore')
                 upload_df.drop(columns='_amount_vat',inplace=True, errors='ignore')
                 upload_df.drop(columns='product_name',inplace=True, errors='ignore')
-                upload_df.drop(columns='ean',inplace=True, errors='ignore')
+                upload_df.drop(columns='month',inplace=True, errors='ignore')
+                upload_df.drop(columns='year',inplace=True, errors='ignore')
                 current_time = datetime.datetime.now(pytz.timezone(st.secrets['TIMEZONE']))
                 upload_df['upload_time'] = current_time
+
+                
+                
 
             elif country == "NO" :
                 upload_df = df.copy()
