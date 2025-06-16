@@ -7,12 +7,10 @@ import numpy as np
 from shareplum import Site
 from shareplum import Office365
 from shareplum.site import Version
-from utils.send_email import send_email
-from utils.get_master_data import get_master_data
-from utils.db_query import init_connection
 from utils.utilities import auth_widgets
-from sqlalchemy import text
 from io import BytesIO
+from utils.db_query import custom_query
+from sqlalchemy import text
 
 
 st.set_page_config(layout="wide")
@@ -39,6 +37,18 @@ def get_start_and_end_date_from_calendar_week(year, iso_week):
     ).date()
     return monday, monday + datetime.timedelta(days=6.9)
 
+
+SOK_LOCATION_ADDRESS = custom_query("""
+SELECT 
+    UPPER(name) AS name,
+    UPPER(CONCAT(name, ' ', sok_location_id)) AS sok_location_name_id,
+    address AS delivery_address,
+    post_code AS delivery_post_code,
+    city AS delivery_city
+FROM master.sok_location;
+""")
+
+st.write(SOK_LOCATION_ADDRESS)
 
 # Start writing title
 st.markdown("# Invoice CSV template 🎈")
@@ -487,6 +497,19 @@ if last_externalID_ns is not None and sok_data is not None:
             & (new_df["month"] == start_of_week.month)
         ] = (new_df["invoice_text_1"].str.split("-", expand=True)[1].str.strip())
 
+    new_df["sok_location_name_id"] = new_df["Store"].map(
+        dict(zip(SOK_LOCATION_ADDRESS["name"], SOK_LOCATION_ADDRESS["sok_location_name_id"]))
+    )
+
+    new_df["delivery_address"] = new_df["Store"].map(
+        dict(zip(SOK_LOCATION_ADDRESS["name"], SOK_LOCATION_ADDRESS["delivery_address"]))
+    )
+    new_df["delivery_post_code"] = new_df["Store"].map(
+        dict(zip(SOK_LOCATION_ADDRESS["name"], SOK_LOCATION_ADDRESS["delivery_post_code"]))
+    )
+    new_df["delivery_city"] = new_df["Store"].map(
+        dict(zip(SOK_LOCATION_ADDRESS["name"], SOK_LOCATION_ADDRESS["delivery_city"]))
+    )
 
 
     st.header("Download CSV file")
