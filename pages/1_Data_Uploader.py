@@ -275,8 +275,18 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                 upload_df['country'] = country
                 upload_df['account_id'] = upload_df["country"] +"-"+ upload_df['account_id'].astype(str)
                 location_master_data_copy = location_master_data[['Location (NS)','Internal ID']].copy().dropna()
-                upload_df['location_id'] = upload_df['location_internal_name'].map(dict(zip(location_master_data_copy['Location (NS)'],location_master_data_copy['Internal ID'])))
-                upload_df = upload_df.loc[~((upload_df['location_id'].isna()) & (upload_df['location_internal_name'] != '- No Location -'))]
+                
+                # Filter rows where 'location_internal_name' matches the pattern "L[1-3 digits] ..."
+                upload_df = upload_df[upload_df['location_internal_name'].str.match(r'^L\d{1,3}\s.+')]
+
+                # Extract the numeric ID and store in 'location_id'
+                upload_df['location_id'] = upload_df['location_internal_name'].str.extract(r'^L(\d{1,3})')
+
+                # Convert 'location_id' to integer
+                upload_df['location_id'] = upload_df['location_id'].astype(int)
+                # st.write(upload_df)
+                # upload_df['location_id'] = upload_df['location_internal_name'].map(dict(zip(location_master_data_copy['Location (NS)'],location_master_data_copy['Internal ID'])))
+                # upload_df = upload_df.loc[~((upload_df['location_id'].isna()) & (upload_df['location_internal_name'] != '- No Location -'))]
                 upload_df.drop(columns=['location_internal_name','country'], inplace=True, errors='ignore')
             elif country == "EE":
                 upload_df = df.copy()
