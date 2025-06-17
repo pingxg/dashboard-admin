@@ -540,12 +540,12 @@ if db_option_up != '< Please select one table >':
                 if filename not in st.session_state['upload_history'].keys():
                     try:
                         info_placeholder.info(f'Start updateing {upload_df.shape[0]} rows of {db_option_up.replace("_"," ")}...',icon="ℹ️")
+                        # custom_query("SET SQL_SAFE_UPDATES = 0;")
                         custom_query(f"""
-                            SET SQL_SAFE_UPDATES = 0
                             DELETE FROM financial_data
-                            WHERE month={month} AND year={year} AND account_id LIKE '{country}-%'
-                            SET SQL_SAFE_UPDATES = 1;
-                            """)
+                            WHERE month={month} AND year={year} AND account_id LIKE '{country}-%';
+                        """)
+                        # custom_query("SET SQL_SAFE_UPDATES = 1;")
                         upload_df.to_sql(name=db_option_up, con=con, schema="data", index=False, if_exists='append', chunksize=1000, method='multi')
                         st.session_state['upload_history'][filename] = 'uploaded'
                     except Exception as e:

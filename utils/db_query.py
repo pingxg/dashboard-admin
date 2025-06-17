@@ -138,16 +138,36 @@ def querying_data(table_name, ids, start, end):
     # conn.close()
     return df
 
+# @st.cache_resource(ttl=600, show_spinner=False)
+# def custom_query(query) -> pd.DataFrame:
+#     conn = init_connection().connect()
+#     if query.strip().upper().startswith("SELECT"):
+#         df = pd.read_sql(text(query), con = conn)
+#         conn.close()
+#         return df
+#     else:
+#         conn.execute(text(query))
+#         conn.close()
+
 @st.cache_resource(ttl=600, show_spinner=False)
 def custom_query(query) -> pd.DataFrame:
     conn = init_connection().connect()
     if query.strip().upper().startswith("SELECT"):
-        df = pd.read_sql(text(query), con = conn)
+        df = pd.read_sql(text(query), con=conn)
         conn.close()
         return df
     else:
-        conn.execute(text(query))
-        conn.close()
+        # Start transaction
+        trans = conn.begin()
+        try:
+            conn.execute(text(query))
+            trans.commit()  # ✅ commit changes
+        except Exception as e:
+            trans.rollback()  # Rollback if anything fails
+            raise e
+        finally:
+            conn.close()
+
 
 def custom_query_wo_cache(query) -> pd.DataFrame:
     conn = init_connection().connect()

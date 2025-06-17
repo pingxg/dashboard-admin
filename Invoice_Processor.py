@@ -48,8 +48,6 @@ SELECT
 FROM master.sok_location;
 """)
 
-st.write(SOK_LOCATION_ADDRESS)
-
 # Start writing title
 st.markdown("# Invoice CSV template 🎈")
 st.markdown("### Upload raw sales data")
