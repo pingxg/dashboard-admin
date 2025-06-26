@@ -450,7 +450,7 @@ def process_data(df, filename, table_name, country=None, month=None, year=None):
                     upload_df["amount"] = -1 * pd.to_numeric(
                         upload_df["amount"], errors="coerce"
                     )
-                    upload_df["type"] = "opening costs"
+                    upload_df["record_type"] = "opening costs"
                 else:
                     upload_df["amount"] = pd.to_numeric(
                         upload_df["amount"], errors="coerce"
