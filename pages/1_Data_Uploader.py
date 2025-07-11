@@ -1002,7 +1002,7 @@ if db_option_up != "< Please select one table >":
         if upload_df is not None:
             st.dataframe(upload_df, use_container_width=True)
         info_placeholder = st.empty()
-        if db_option_up == "financial_data":
+        if db_option_up == "financial_data" and country !="EE":
             update_btn = st.button(
                 "Update records", key=f"{db_option_up}_update_button"
             )
@@ -1014,14 +1014,12 @@ if db_option_up != "< Please select one table >":
                             f'Start updateing {upload_df.shape[0]} rows of {db_option_up.replace("_"," ")}...',
                             icon="ℹ️",
                         )
-                        # custom_query("SET SQL_SAFE_UPDATES = 0;")
                         custom_query(
                             f"""
                             DELETE FROM financial_data
                             WHERE month={month} AND year={year} AND account_id LIKE '{country}-%';
                         """
                         )
-                        # custom_query("SET SQL_SAFE_UPDATES = 1;")
                         upload_df.to_sql(
                             name=db_option_up,
                             con=con,
