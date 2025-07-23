@@ -133,7 +133,6 @@ if last_externalID_ns is not None and sok_data is not None:
     # remove empty rows
     df = df.dropna()
 
-
     df["ALV14"] = (
         df["ALV14"].astype(str).str.replace(" ", "")
     )  # remove all the spaces in the value
@@ -385,7 +384,6 @@ if last_externalID_ns is not None and sok_data is not None:
         (df["Store"] == "SALE HÄMEENKATU TURKU")
         & (df["Delivery Note Date"] >= "2025-06-12")
     ] = "L17 Sushibar Itäharju Prisma Turku"
-
 
 
     df = df.sort_values(
